@@ -10,8 +10,8 @@ jobs:
       - run:
           name: Restore verified source
           command: |
-            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-ci.1.zip
-            echo "7acf51c64cebe25517f79056338f0ca25ea3d301819dc77474ebb6e9c8e4c833  /tmp/fs-source.zip" | sha256sum -c -
+            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-ci.2.zip
+            echo "d3617d07acd1d9c5499dcf0bbb883f81fb5f4876f52a641b26b02edb5e6672c4  /tmp/fs-source.zip" | sha256sum -c -
             unzip -oq /tmp/fs-source.zip
       - run:
           name: Install dependencies

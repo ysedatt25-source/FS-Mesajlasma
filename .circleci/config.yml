@@ -12,7 +12,7 @@ jobs:
           command: |
             curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-ci.1.zip
             echo "7acf51c64cebe25517f79056338f0ca25ea3d301819dc77474ebb6e9c8e4c833  /tmp/fs-source.zip" | sha256sum -c -
-            unzip -q /tmp/fs-source.zip
+            unzip -oq /tmp/fs-source.zip
       - run:
           name: Install dependencies
           command: |

@@ -1,0 +1,48 @@
+version: 2.1
+jobs:
+  test-and-build:
+    docker:
+      - image: cimg/android:2026.11.1-node
+    resource_class: medium
+    working_directory: ~/project
+    steps:
+      - checkout
+      - run:
+          name: Restore verified source
+          command: |
+            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-ci.1.zip
+            echo "7acf51c64cebe25517f79056338f0ca25ea3d301819dc77474ebb6e9c8e4c833  /tmp/fs-source.zip" | sha256sum -c -
+            unzip -q /tmp/fs-source.zip
+      - run:
+          name: Install dependencies
+          command: |
+            python3 -m venv .venv
+            .venv/bin/pip install -r server/requirements.txt
+            npm ci
+      - run:
+          name: Test server, encryption and interface
+          command: |
+            . .venv/bin/activate
+            mkdir -p build/ci
+            set -o pipefail
+            python -m unittest discover -s tests -p "test_*.py" -v 2>&1 | tee build/ci/server-tests.log
+            npm test 2>&1 | tee build/ci/web-tests.log
+      - run:
+          name: Restore verified build tools and media
+          command: |
+            python3 tools/fetch_assets.py
+            python3 tools/setup_android.py
+      - run:
+          name: Compile Android
+          command: |
+            python3 tools/build_android.py
+            cp build/android/aligned.apk build/ci/FS-Mesajlasma-34.32-unsigned.apk
+            sha256sum build/ci/*.apk > build/ci/SHA256SUMS.txt
+            printf "%s\n" "Unsigned CI build; production signing and live backend are not configured." > build/ci/STATUS.txt
+      - store_artifacts:
+          path: build/ci
+          destination: fs-mesajlasma
+workflows:
+  android-development:
+    jobs:
+      - test-and-build

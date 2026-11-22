@@ -10,8 +10,8 @@ jobs:
       - run:
           name: Restore verified source
           command: |
-            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-ci.2.zip
-            echo "d3617d07acd1d9c5499dcf0bbb883f81fb5f4876f52a641b26b02edb5e6672c4  /tmp/fs-source.zip" | sha256sum -c -
+            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-ci.3.zip
+            echo "447852d5f30ba0ad3210c12c03b900d59d5ae3dd98b5939f7c50e6b71bd08e27  /tmp/fs-source.zip" | sha256sum -c -
             unzip -oq /tmp/fs-source.zip
       - run:
           name: Install dependencies
@@ -40,7 +40,7 @@ jobs:
             python3 tools/build_android.py
             cp build/android/aligned.apk build/ci/FS-Mesajlasma-34.32-unsigned.apk
             sha256sum build/ci/*.apk > build/ci/SHA256SUMS.txt
-            printf "%s\n" "Unsigned CI build; production signing and live backend are not configured." > build/ci/STATUS.txt
+            printf "%s\n" "Unsigned CI build. Live API bundled; TURN media and physical-device checks incomplete." > build/ci/STATUS.txt
       - store_artifacts:
           path: build/ci
           destination: fs-mesajlasma

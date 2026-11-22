@@ -1,15 +1,13 @@
 # FS Mesajlaşma
 
-[İmzalı APK — 34.32 düzeltme 2](https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-Mesajlasma-34.32-duzeltme2-imzali.apk)
+[İmzalı APK — canlı API bağlantılı 34.32, derleme 3](https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-Mesajlasma-34.32-canli3-imzali.apk)
 
-Ekran görüntüsü engeli kaldırıldı. Hesap şifresi en az 6 karakter; hesap makinesi PIN’i en az 6 rakam. Android versionCode 2, aynı yayın sertifikası.
+Bağımsız API Railway üzerinde yayında; adres APK içinde hazırdır. Kayıt için ayrıca sunucu adresi girilmez. Ekran görüntüsü serbesttir; hesap şifresi en az 6 karakter, hesap makinesi PIN’i en az 6 rakamdır.
 
-Kayıtta yanlışlıkla yerel APK arayüzüne API isteği gönderilmesi önlendi. Sunucu adresi sağlık kontrolünden geçmeden kaydedilmez. Eksik sunucu ve ağ hataları açıklanır.
+Canlı iki sentetik hesapla kayıt/giriş, Android CORS, kullanıcı adıyla kişi bulma, oda oluşturma, WSS şifreli mesaj ve karşı hesapta çözme, şifreli dosya aktarımı ve arama davet/yanıt/bitirme sinyalleri doğrulandı. Kalıcı FS depolaması mevcut sitelerden ve veritabanlarından ayrıdır.
 
-[Kaynak paketi](https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-ci.2.zip) · [Emoji varlıkları](https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-emoji-assets-34.32.zip) · [CircleCI](https://app.circleci.com/pipelines/github/ysedatt25-source/FS-Mesajlasma)
+Yerel doğrulama: 36 sunucu testi, 12 bağlantı/kriptografi testi, 13 DOM akışı. Eski mesajlarda aynı milisaniyeli kayıtların atlanması da düzeltildi.
 
-Yerel doğrulama: 32 sunucu testi, 12 bağlantı/kriptografi testi ve 13 DOM akışı geçti. Altı karakterli şifreyle kayıt/giriş test edildi. APK imzası doğrulandı. Fiziksel Android cihaz testi yapılmadı.
+[Kaynak paketi](https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-ci.3.zip) · [Emoji varlıkları](https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-emoji-assets-34.32.zip) · [CircleCI](https://app.circleci.com/pipelines/github/ysedatt25-source/FS-Mesajlasma)
 
-**Canlı API sunucusu kurulmadı.** Bu dosya geliştirme sürümüdür; internet üzerinden kayıt, mesajlaşma ve arama için sürekli çalışan güncel HTTPS API/TURN sunucusu gerekir. GitHub indirme ve CircleCI derleme hizmetidir. 404 düzeltmesi bu sunucuyu kurmaz.
-
-CI kaynak ve emoji paketlerini SHA-256 ile doğrular, testleri çalıştırır ve imzasız Android APK üretir. İmzalama mevcut özel anahtarla ayrı güvenli adımda yapılır; özel anahtar depoda bulunmaz.
+**Tam üretim sürümü onaylanmadı.** TURN rölesi ve gerçek Android cihazlarda farklı ağlar üzerinden ses/görüntü, Bluetooth ve arka plan testleri tamamlanmadı. Arama sinyalleri testi, ses ve görüntü medyasını doğrulamaz. Yönetici cihaz kimliği ve eksiksiz yönetim arayüzü de bekliyor. Sıfır hata, WhatsApp’tan hızlı çalışma veya süresiz ücretsiz sağlayıcı garantisi verilmez.

@@ -1,93 +1,81 @@
+
 version: 2.1
-commands:
-  restore_source:
-    steps:
-      - checkout
-      - run:
-          name: Restore verified Native12 source
-          command: |
-            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-native12.zip
-            echo "0bddc01a39c26a1976611b113c918caa4a3a3862db3e066efa8716975af26dda /tmp/fs-source.zip" | sha256sum -c -
-            unzip -oq /tmp/fs-source.zip
 jobs:
-  native-build:
-    docker:
-      - image: cimg/android:2026.11.1-node
-    resource_class: medium
-    working_directory: ~/project
-    steps:
-      - restore_source
-      - run:
-          name: Restore Android tools and media
-          command: |
-            python3 tools/fetch_assets.py
-            python3 tools/setup_android.py
-      - run:
-          name: Compile Native12 APK
-          command: |
-            mkdir -p build/ci
-            python3 tools/build_android.py
-            cp build/android/aligned.apk build/ci/FS-Mesajlasma-34.32-native12-unsigned.apk
-            sha256sum build/ci/*.apk > build/ci/SHA256SUMS.txt
-      - store_artifacts:
-          path: build/ci
-          destination: fs-native12
   regression-tests:
     docker:
       - image: cimg/android:2026.11.1-node
     resource_class: medium
     working_directory: ~/project
     steps:
-      - restore_source
+      - checkout
       - run:
-          name: Install dependencies
+          name: Restore verified Native12 tests3 source
+          command: |
+            mkdir -p build/ci
+            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-native12-tests3.zip
+            echo "664d42fad31c3ec159dbfdac9aad2928b856eaad14e74e01497f5190c3ea0d34  /tmp/fs-source.zip" | sha256sum -c -
+            unzip -oq /tmp/fs-source.zip
+      - run:
+          name: Install pinned test dependencies
           command: |
             sudo apt-get update -qq
             sudo apt-get install -y python3-venv
             python3 -m venv .venv
             .venv/bin/pip install -r server/requirements.txt
             npm ci
-            mkdir -p build/ci
+            node --version
+            npm --version
+            python3 --version
       - run:
-          name: Server and portable unit tests
+          name: Server and database tests
+          when: always
           command: |
             set -o pipefail
+            mkdir -p build/ci
             . .venv/bin/activate
+            rc=0
             for suite in test_server.py test_database.py test_turn.py; do
-              python -m unittest discover -s tests -p "$suite" -v || exit 1
-            done 2>&1 | tee build/ci/server-tests.log
-            node --test tests/portable-*.test.mjs 2>&1 | tee build/ci/portable-tests.log
+              python -m unittest discover -s tests -p "$suite" -v 2>&1 | tee "build/ci/$suite.log" || rc=1
+            done
+            exit "$rc"
       - run:
-          name: Legacy unit tests
+          name: JavaScript regression tests
           when: always
           command: |
             set -o pipefail
-            mkdir -p build/ci
-            node --test tests/crypto.test.mjs tests/connection.test.mjs tests/regressions.test.mjs tests/calculator-ui.test.mjs tests/interactions.test.mjs tests/feedback.test.mjs tests/chat-tools.test.mjs tests/media-worker.test.mjs 2>&1 | tee build/ci/legacy-tests.log
+            node --test --test-concurrency=1 tests/*.test.mjs 2>&1 | tee build/ci/javascript-tests.log
       - run:
-          name: Full isolated DOM integration test
+          name: Full isolated DOM integration
           when: always
           command: |
             set -o pipefail
-            mkdir -p build/ci
             . .venv/bin/activate
             node tests/dom.test.mjs 2>&1 | tee build/ci/dom-tests.log
       - run:
-          name: Real Chromium security and interface tests
+          name: Real Chromium component checks
           when: always
           command: |
             set -o pipefail
-            mkdir -p build/ci
             . .venv/bin/activate
             pip install playwright==1.57.0
             python -m playwright install --with-deps chromium
-            python tests/test_calculator_dom.py 2>&1 | tee build/ci/calculator-browser.log
-            python tests/test_remaining_browser.py 2>&1 | tee build/ci/remaining-browser.log
+            rc=0
+            for suite in test_calculator_dom.py test_remaining_browser.py test_emoji_ack_browser.py test_chat_viewport_dom.py test_latest_button_dom.py test_composer_dom.py; do
+              python "tests/$suite" 2>&1 | tee "build/ci/$suite.log" || rc=1
+            done
+            exit "$rc"
+      - run:
+          name: Preserve reproducible dependencies if any check fails
+          when: on_fail
+          command: |
+            mkdir -p build/ci
+            if [ -d node_modules ]; then
+              tar -czf build/ci/npm-test-dependencies.tar.gz node_modules package.json package-lock.json
+            fi
       - store_artifacts:
           path: build/ci
-          destination: fs-native12-tests
+          destination: fs-native12-tests3
 workflows:
-  native12:
+  native12-tests3:
     jobs:
-      - native-build
       - regression-tests

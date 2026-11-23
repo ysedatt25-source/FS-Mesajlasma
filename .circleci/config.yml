@@ -1,14 +1,13 @@
-
 version: 2.1
 commands:
   restore_source:
     steps:
       - checkout
       - run:
-          name: Restore verified native11 source
+          name: Restore verified Native12 source
           command: |
-            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-native11-tests2.zip
-            echo "3ab6ca81af8ec520f835bd7ebed69161e1d64ce0d25a504aea35cb99427f985b  /tmp/fs-source.zip" | sha256sum -c -
+            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-native12.zip
+            echo "0bddc01a39c26a1976611b113c918caa4a3a3862db3e066efa8716975af26dda /tmp/fs-source.zip" | sha256sum -c -
             unzip -oq /tmp/fs-source.zip
 jobs:
   native-build:
@@ -19,20 +18,20 @@ jobs:
     steps:
       - restore_source
       - run:
-          name: Restore verified Android inputs and emoji assets
+          name: Restore Android tools and media
           command: |
             python3 tools/fetch_assets.py
             python3 tools/setup_android.py
       - run:
-          name: Compile native Android version 11 (unsigned)
+          name: Compile Native12 APK
           command: |
             mkdir -p build/ci
             python3 tools/build_android.py
-            cp build/android/aligned.apk build/ci/FS-Mesajlasma-34.32-native11-unsigned.apk
+            cp build/android/aligned.apk build/ci/FS-Mesajlasma-34.32-native12-unsigned.apk
             sha256sum build/ci/*.apk > build/ci/SHA256SUMS.txt
       - store_artifacts:
           path: build/ci
-          destination: fs-native11
+          destination: fs-native12
   regression-tests:
     docker:
       - image: cimg/android:2026.11.1-node
@@ -48,24 +47,33 @@ jobs:
             python3 -m venv .venv
             .venv/bin/pip install -r server/requirements.txt
             npm ci
+            mkdir -p build/ci
       - run:
           name: Server and portable unit tests
           command: |
             set -o pipefail
-            mkdir -p build/ci
             . .venv/bin/activate
             for suite in test_server.py test_database.py test_turn.py; do
               python -m unittest discover -s tests -p "$suite" -v || exit 1
             done 2>&1 | tee build/ci/server-tests.log
             node --test tests/portable-*.test.mjs 2>&1 | tee build/ci/portable-tests.log
       - run:
-          name: Legacy suite (failures are not suppressed)
+          name: Legacy unit tests
+          when: always
           command: |
             set -o pipefail
-            . .venv/bin/activate
-            npm test 2>&1 | tee build/ci/legacy-tests.log
+            mkdir -p build/ci
+            node --test tests/crypto.test.mjs tests/connection.test.mjs tests/regressions.test.mjs tests/calculator-ui.test.mjs tests/interactions.test.mjs tests/feedback.test.mjs tests/chat-tools.test.mjs tests/media-worker.test.mjs 2>&1 | tee build/ci/legacy-tests.log
       - run:
-          name: Real Chromium calculator and interface checks
+          name: Full isolated DOM integration test
+          when: always
+          command: |
+            set -o pipefail
+            mkdir -p build/ci
+            . .venv/bin/activate
+            node tests/dom.test.mjs 2>&1 | tee build/ci/dom-tests.log
+      - run:
+          name: Real Chromium security and interface tests
           when: always
           command: |
             set -o pipefail
@@ -77,8 +85,9 @@ jobs:
             python tests/test_remaining_browser.py 2>&1 | tee build/ci/remaining-browser.log
       - store_artifacts:
           path: build/ci
-          destination: fs-native11-tests
+          destination: fs-native12-tests
 workflows:
-  native11:
+  native12:
     jobs:
+      - native-build
       - regression-tests

@@ -7,8 +7,8 @@ commands:
       - run:
           name: Restore verified native11 source
           command: |
-            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-native11.zip
-            echo "77e4e8359d4d59095e7ceb43684fe5d94a718cf0db87d849e39633b5fd477c78  /tmp/fs-source.zip" | sha256sum -c -
+            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-native11-tests2.zip
+            echo "3ab6ca81af8ec520f835bd7ebed69161e1d64ce0d25a504aea35cb99427f985b  /tmp/fs-source.zip" | sha256sum -c -
             unzip -oq /tmp/fs-source.zip
 jobs:
   native-build:
@@ -64,11 +64,21 @@ jobs:
             set -o pipefail
             . .venv/bin/activate
             npm test 2>&1 | tee build/ci/legacy-tests.log
+      - run:
+          name: Real Chromium calculator and interface checks
+          when: always
+          command: |
+            set -o pipefail
+            mkdir -p build/ci
+            . .venv/bin/activate
+            pip install playwright==1.57.0
+            python -m playwright install --with-deps chromium
+            python tests/test_calculator_dom.py 2>&1 | tee build/ci/calculator-browser.log
+            python tests/test_remaining_browser.py 2>&1 | tee build/ci/remaining-browser.log
       - store_artifacts:
           path: build/ci
           destination: fs-native11-tests
 workflows:
   native11:
     jobs:
-      - native-build
       - regression-tests

@@ -1,4 +1,3 @@
-
 version: 2.1
 jobs:
   regression-tests:
@@ -9,11 +8,11 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Restore verified Native12 tests3 source
+          name: Restore verified Native12 tests5 source
           command: |
             mkdir -p build/ci
-            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-native12-tests3.zip
-            echo "664d42fad31c3ec159dbfdac9aad2928b856eaad14e74e01497f5190c3ea0d34  /tmp/fs-source.zip" | sha256sum -c -
+            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-native12-tests5.zip
+            echo "b6dc2edd5f829c07576d6bed702c20d9be348773e7fefd695ff66ad58d43aabe /tmp/fs-source.zip" | sha256sum -c -
             unzip -oq /tmp/fs-source.zip
       - run:
           name: Install pinned test dependencies
@@ -43,13 +42,19 @@ jobs:
           when: always
           command: |
             set -o pipefail
-            node --test --test-concurrency=1 tests/*.test.mjs 2>&1 | tee build/ci/javascript-tests.log
+            . .venv/bin/activate
+            export FS_TEST_PYTHON="$PWD/.venv/bin/python"
+            mapfile -t suites < <(find tests -maxdepth 1 -name '*.test.mjs' ! -name 'dom.test.mjs' | sort)
+            test "${#suites[@]}" -gt 0
+            node --test --test-concurrency=1 "${suites[@]}" 2>&1 | tee build/ci/javascript-tests.log
       - run:
           name: Full isolated DOM integration
           when: always
           command: |
             set -o pipefail
             . .venv/bin/activate
+            export FS_TEST_PYTHON="$PWD/.venv/bin/python"
+            "$FS_TEST_PYTHON" -c 'import aiohttp; print("DOM Python dependency OK")'
             node tests/dom.test.mjs 2>&1 | tee build/ci/dom-tests.log
       - run:
           name: Real Chromium component checks
@@ -59,6 +64,9 @@ jobs:
             . .venv/bin/activate
             pip install playwright==1.57.0
             python -m playwright install --with-deps chromium
+            export FS_CHROMIUM="$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
+            test -x "$FS_CHROMIUM"
+            echo "Chromium: $FS_CHROMIUM"
             rc=0
             for suite in test_calculator_dom.py test_remaining_browser.py test_emoji_ack_browser.py test_chat_viewport_dom.py test_latest_button_dom.py test_composer_dom.py; do
               python "tests/$suite" 2>&1 | tee "build/ci/$suite.log" || rc=1
@@ -74,8 +82,8 @@ jobs:
             fi
       - store_artifacts:
           path: build/ci
-          destination: fs-native12-tests3
+          destination: fs-native12-tests5
 workflows:
-  native12-tests3:
+  native12-tests5:
     jobs:
       - regression-tests

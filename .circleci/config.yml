@@ -10,8 +10,8 @@ jobs:
       - run:
           name: Restore verified source
           command: |
-            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-ci.3.zip
-            echo "447852d5f30ba0ad3210c12c03b900d59d5ae3dd98b5939f7c50e6b71bd08e27  /tmp/fs-source.zip" | sha256sum -c -
+            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-ci.7.zip
+            echo "9108a4a279ad8fd03a468e340709cf2aa9667ce301ea2fcb58f162d844976a21  /tmp/fs-source.zip" | sha256sum -c -
             unzip -oq /tmp/fs-source.zip
       - run:
           name: Install dependencies
@@ -40,7 +40,7 @@ jobs:
             python3 tools/build_android.py
             cp build/android/aligned.apk build/ci/FS-Mesajlasma-34.32-unsigned.apk
             sha256sum build/ci/*.apk > build/ci/SHA256SUMS.txt
-            printf "%s\n" "Unsigned CI build. Live API bundled; TURN media and physical-device checks incomplete." > build/ci/STATUS.txt
+            printf "%s\n" "Unsigned CI build. Physical Android media, Bluetooth and overlay checks incomplete." > build/ci/STATUS.txt
       - store_artifacts:
           path: build/ci
           destination: fs-mesajlasma

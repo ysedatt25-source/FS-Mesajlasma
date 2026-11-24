@@ -22,6 +22,10 @@ commands:
             echo "43099b657fa89b80ca617c989c0747a40a152ceea79e22da32788f9c7473cf93  /tmp/fs-ci-fix02.zip" | sha256sum -c -
             unzip -oq /tmp/fs-ci-fix02.zip
             sha256sum -c source-madde17.sha256 > /tmp/fs-patched-source02-check.log
+            curl --fail --location --retry 3 -o /tmp/fs-ci-fix03.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-34.32-CI-Hata-Duzeltme-03.zip
+            echo "5c1e475ecffd8be8170220bfc5fb375929ef5d0f060f360a9e27c60023cccace  /tmp/fs-ci-fix03.zip" | sha256sum -c -
+            unzip -oq /tmp/fs-ci-fix03.zip
+            sha256sum -c source-madde17.sha256 > /tmp/fs-patched-source03-check.log
 jobs:
   regression-tests:
     docker:

@@ -1,89 +1,63 @@
 version: 2.1
+commands:
+  restore_madde17:
+    steps:
+      - checkout
+      - run:
+          name: Restore verified current source
+          command: |
+            FS_SOURCE_URL="https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-34.32-Tek-Kaynak-Paketi.zip"
+            curl --fail --location --retry 3 -o /tmp/fs-source.zip "$FS_SOURCE_URL"
+            echo "83de006dcd53949f58aa0c0be920af03a425c6447fca1944ac0494cd1bf1489b  /tmp/fs-source.zip" | sha256sum -c -
+            unzip -oq /tmp/fs-source.zip
+            python3 tools/fetch_assets.py
+            test -f tools/ci_verify.py
+            test -f source-madde17.sha256
+            sha256sum -c source-madde17.sha256 > /tmp/fs-source-check.log
 jobs:
   regression-tests:
     docker:
       - image: cimg/android:2026.11.1-node
-    resource_class: medium
-    working_directory: ~/project
+    resource_class: large
     steps:
-      - checkout
+      - restore_madde17
       - run:
-          name: Restore verified Native12 tests5 source
-          command: |
-            mkdir -p build/ci
-            curl --fail --location --retry 3 -o /tmp/fs-source.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-source-34.32-native12-tests5.zip
-            echo "b6dc2edd5f829c07576d6bed702c20d9be348773e7fefd695ff66ad58d43aabe /tmp/fs-source.zip" | sha256sum -c -
-            unzip -oq /tmp/fs-source.zip
-      - run:
-          name: Install pinned test dependencies
+          name: Install test dependencies
           command: |
             sudo apt-get update -qq
             sudo apt-get install -y python3-venv
             python3 -m venv .venv
-            .venv/bin/pip install -r server/requirements.txt
-            npm ci
-            node --version
-            npm --version
-            python3 --version
-      - run:
-          name: Server and database tests
-          when: always
-          command: |
-            set -o pipefail
-            mkdir -p build/ci
             . .venv/bin/activate
-            rc=0
-            for suite in test_server.py test_database.py test_turn.py; do
-              python -m unittest discover -s tests -p "$suite" -v 2>&1 | tee "build/ci/$suite.log" || rc=1
-            done
-            exit "$rc"
-      - run:
-          name: JavaScript regression tests
-          when: always
-          command: |
-            set -o pipefail
-            . .venv/bin/activate
-            export FS_TEST_PYTHON="$PWD/.venv/bin/python"
-            mapfile -t suites < <(find tests -maxdepth 1 -name '*.test.mjs' ! -name 'dom.test.mjs' | sort)
-            test "${#suites[@]}" -gt 0
-            node --test --test-concurrency=1 "${suites[@]}" 2>&1 | tee build/ci/javascript-tests.log
-      - run:
-          name: Full isolated DOM integration
-          when: always
-          command: |
-            set -o pipefail
-            . .venv/bin/activate
-            export FS_TEST_PYTHON="$PWD/.venv/bin/python"
-            "$FS_TEST_PYTHON" -c 'import aiohttp; print("DOM Python dependency OK")'
-            node tests/dom.test.mjs 2>&1 | tee build/ci/dom-tests.log
-      - run:
-          name: Real Chromium component checks
-          when: always
-          command: |
-            set -o pipefail
-            . .venv/bin/activate
-            pip install playwright==1.57.0
+            pip install -r server/requirements.txt playwright==1.57.0
+            npm ci --no-audit --no-fund
             python -m playwright install --with-deps chromium
-            export FS_CHROMIUM="$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
-            test -x "$FS_CHROMIUM"
-            echo "Chromium: $FS_CHROMIUM"
-            rc=0
-            for suite in test_calculator_dom.py test_remaining_browser.py test_emoji_ack_browser.py test_chat_viewport_dom.py test_latest_button_dom.py test_composer_dom.py; do
-              python "tests/$suite" 2>&1 | tee "build/ci/$suite.log" || rc=1
-            done
-            exit "$rc"
       - run:
-          name: Preserve reproducible dependencies if any check fails
-          when: on_fail
+          name: Complete regression tests
           command: |
-            mkdir -p build/ci
-            if [ -d node_modules ]; then
-              tar -czf build/ci/npm-test-dependencies.tar.gz node_modules package.json package-lock.json
-            fi
+            . .venv/bin/activate
+            export FS_CHROMIUM="$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
+            python tools/ci_verify.py
+          no_output_timeout: 20m
+      - store_artifacts:
+          path: build/ci/test-logs
+          destination: regression-logs
+  android-build:
+    docker:
+      - image: cimg/android:2026.11.1-node
+    resource_class: large
+    steps:
+      - restore_madde17
+      - run:
+          name: Build Android APK
+          command: bash tools/build_push_ci.sh
+          no_output_timeout: 20m
       - store_artifacts:
           path: build/ci
-          destination: fs-native12-tests5
+          destination: madde17-unsigned
 workflows:
-  native12-tests5:
+  madde17:
     jobs:
       - regression-tests
+      - android-build:
+          requires:
+            - regression-tests

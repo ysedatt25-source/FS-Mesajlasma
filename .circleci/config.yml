@@ -18,11 +18,16 @@ commands:
             test -f tools/ci_verify.py
             # Restore every missing original asset, not just one sentinel file.
             if ! python3 tools/verify_release_assets.py; then
-              : "${FS_LEGACY_APK_URL:?Set HTTPS URL of the verified Native13 unsigned APK}"
-              curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' -o /tmp/fs-legacy.apk "$FS_LEGACY_APK_URL"
-              echo "0a8f5e9e1efec2f8653b394bb2b60dd379c41c90f09df759c51c2d00b48fabed  /tmp/fs-legacy.apk" | sha256sum -c -
-              python3 tools/restore_web_assets_from_apk.py /tmp/fs-legacy.apk
-              rm -f /tmp/fs-legacy.apk
+              # Restore the original versioned emoji archive first (SHA-256 pinned by fetch_assets.py).
+              if python3 tools/fetch_assets.py && python3 tools/verify_release_assets.py; then
+                echo 'Original emoji archive restored and verified.'
+              else
+                : "${FS_LEGACY_APK_URL:?Set HTTPS URL of the verified Native13 unsigned APK}"
+                curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' -o /tmp/fs-legacy.apk "$FS_LEGACY_APK_URL"
+                echo "0a8f5e9e1efec2f8653b394bb2b60dd379c41c90f09df759c51c2d00b48fabed  /tmp/fs-legacy.apk" | sha256sum -c -
+                python3 tools/restore_web_assets_from_apk.py /tmp/fs-legacy.apk
+                rm -f /tmp/fs-legacy.apk
+              fi
             fi
             python3 tools/verify_release_assets.py
             test -f SHA256-ARAMA-SESI.txt

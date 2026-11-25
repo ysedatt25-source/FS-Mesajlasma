@@ -1,38 +1,40 @@
 version: 2.1
 commands:
-  restore_madde17:
+  restore_call_audio:
     steps:
-      - checkout
+      - checkout:
+          path: /tmp/fs-repository
       - run:
           name: Restore exact consolidated source (no legacy fallback)
           command: |
-            FS_SOURCE_URL="https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-34.32-Tek-Kaynak-Paketi.zip"
+            set -euo pipefail
+            : "${FS_SOURCE_URL:?Set HTTPS URL of the exact latest source archive}"
             curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' -o /tmp/fs-source.zip "$FS_SOURCE_URL"
-            echo "83de006dcd53949f58aa0c0be920af03a425c6447fca1944ac0494cd1bf1489b  /tmp/fs-source.zip" | sha256sum -c -
-            unzip -oq /tmp/fs-source.zip
-            python3 tools/fetch_assets.py
+            echo "ff3bfa30e21b0515d12093978540a9078a9a91358f570a74818eedc3dada4d3f  /tmp/fs-source.zip" | sha256sum -c -
+            # Isolate the source from old checkout contents.
+            mkdir -p /tmp/fs-release-source
+            unzip -oq /tmp/fs-source.zip -d /tmp/fs-release-source
+            cp -a /tmp/fs-release-source/. .
             test -f tools/ci_verify.py
-            test -f source-madde17.sha256
-            sha256sum -c source-madde17.sha256 > /tmp/fs-source-check.log
-            curl --fail --location --retry 3 -o /tmp/fs-ci-fix.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-34.32-CI-Hata-Duzeltme-01.zip
-            echo "ccf7fe005f1314a039c4728aa0031edaa1df1a7b1c30f5eef1d2d9da3d61ea36  /tmp/fs-ci-fix.zip" | sha256sum -c -
-            unzip -oq /tmp/fs-ci-fix.zip
-            sha256sum -c source-madde17.sha256 > /tmp/fs-patched-source-check.log
-            curl --fail --location --retry 3 -o /tmp/fs-ci-fix02.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-34.32-CI-Hata-Duzeltme-02.zip
-            echo "43099b657fa89b80ca617c989c0747a40a152ceea79e22da32788f9c7473cf93  /tmp/fs-ci-fix02.zip" | sha256sum -c -
-            unzip -oq /tmp/fs-ci-fix02.zip
-            sha256sum -c source-madde17.sha256 > /tmp/fs-patched-source02-check.log
-            curl --fail --location --retry 3 -o /tmp/fs-ci-fix03.zip https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-34.32-CI-Hata-Duzeltme-03.zip
-            echo "5c1e475ecffd8be8170220bfc5fb375929ef5d0f060f360a9e27c60023cccace  /tmp/fs-ci-fix03.zip" | sha256sum -c -
-            unzip -oq /tmp/fs-ci-fix03.zip
-            sha256sum -c source-madde17.sha256 > /tmp/fs-patched-source03-check.log
+            # Restore every missing original asset, not just one sentinel file.
+            if ! python3 tools/verify_release_assets.py; then
+              : "${FS_LEGACY_APK_URL:?Set HTTPS URL of the verified Native13 unsigned APK}"
+              curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' -o /tmp/fs-legacy.apk "$FS_LEGACY_APK_URL"
+              echo "0a8f5e9e1efec2f8653b394bb2b60dd379c41c90f09df759c51c2d00b48fabed  /tmp/fs-legacy.apk" | sha256sum -c -
+              python3 tools/restore_web_assets_from_apk.py /tmp/fs-legacy.apk
+              rm -f /tmp/fs-legacy.apk
+            fi
+            python3 tools/verify_release_assets.py
+            test -f SHA256-ARAMA-SESI.txt
+            sha256sum -c SHA256-ARAMA-SESI.txt > /tmp/fs-source-check.log
 jobs:
   regression-tests:
     docker:
       - image: cimg/android:2026.11.1-node
     resource_class: large
+    working_directory: ~/fs-release
     steps:
-      - restore_madde17
+      - restore_call_audio
       - run:
           name: Install pinned test dependencies
           command: |
@@ -57,19 +59,56 @@ jobs:
     docker:
       - image: cimg/android:2026.11.1-node
     resource_class: large
+    working_directory: ~/fs-release
     steps:
-      - restore_madde17
+      - restore_call_audio
       - run:
           name: Build unsigned Android APK with mandatory Firebase client configuration
-          command: bash tools/build_push_ci.sh
+          command: |
+            set -euo pipefail
+            bash tools/build_push_ci.sh
+            test -s build/push-metadata/build-info.json
+            sha256sum build/push-metadata/build-info.json >> build/ci/SHA256SUMS.txt
+            sha256sum -c build/ci/SHA256SUMS.txt
+          no_output_timeout: 20m
+      - persist_to_workspace:
+          root: .
+          paths:
+            - build/ci/FS-Mesajlasma-34.32-native13-push-unsigned.apk
+            - build/ci/SHA256SUMS.txt
+            - build/push-metadata/build-info.json
+  android-sign:
+    docker:
+      - image: cimg/android:2026.11.1-node
+    resource_class: large
+    working_directory: ~/fs-release
+    steps:
+      - restore_call_audio
+      - attach_workspace:
+          at: .
+      - run:
+          name: Verify build artifact and sign with existing release certificate
+          command: |
+            set -euo pipefail
+            test -s build/push-metadata/build-info.json
+            sha256sum -c build/ci/SHA256SUMS.txt
+            sdkmanager 'build-tools;35.0.0'
+            bash tools/sign_push_ci.sh
           no_output_timeout: 20m
       - store_artifacts:
-          path: build/ci
-          destination: madde17-unsigned
+          path: build/ci/signed
+          destination: signed-device-test-candidate
 workflows:
-  madde17:
+  fs-34-32-final-candidate:
     jobs:
       - regression-tests
       - android-build:
           requires:
             - regression-tests
+      - android-sign:
+          requires:
+            - android-build
+          filters:
+            branches:
+              only: main
+          context: fs-release-signing

@@ -5,7 +5,7 @@ commands:
       - checkout:
           path: /tmp/fs-repository
       - run:
-          name: Restore exact consolidated source and verified emoji parts V4
+          name: Restore exact consolidated source and verified emoji parts V5
           command: |
             set -euo pipefail
             : "${FS_SOURCE_URL:?Set HTTPS URL of the exact latest source archive}"
@@ -17,19 +17,19 @@ commands:
             test -f tools/ci_verify.py
             release_base="https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1"
             mkdir -p /tmp/fs-emoji-v4
+            printf '%s\n' \
+              '149592bb4328fddab97f44847cf23a107aa154904d1b158658b28255928890e6  FS-34.32-Emoji-V4-01.zip' \
+              '79f795bb3ef1ab576c244c23a768bb950ec62b2ee78419e4c79ce702a2013542  FS-34.32-Emoji-V4-02.zip' \
+              'bcedb7c1b07a92a0f8a06b3e167871e622c28d1b6d19db82c5c0cc7a45153d83  FS-34.32-Emoji-V4-03.zip' \
+              '07fcd77c1294378331a9dc46150b7088235cc1522200955e9b4f1141fc5d45d7  FS-34.32-Emoji-V4-04.zip' \
+              '98cf0b5502d9e91b1da85257416f339e2d26eb6d30c9645be27c512a676f3768  FS-34.32-Emoji-V4-05.zip' \
+              '052b50dd329d1d5a9eee0ce6ba55d1c5d111f91de426429cd12d4407a2697ea0  FS-34.32-Emoji-V4-06.zip' |
             while read -r digest name; do
               curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' -o "/tmp/fs-emoji-v4/$name" "$release_base/$name"
               printf '%s  %s\n' "$digest" "/tmp/fs-emoji-v4/$name" | sha256sum -c -
               unzip -oq "/tmp/fs-emoji-v4/$name" -d .
               rm -f "/tmp/fs-emoji-v4/$name"
-            done <<'FS_EMOJI_V4_HASHES'
-            149592bb4328fddab97f44847cf23a107aa154904d1b158658b28255928890e6  FS-34.32-Emoji-V4-01.zip
-            79f795bb3ef1ab576c244c23a768bb950ec62b2ee78419e4c79ce702a2013542  FS-34.32-Emoji-V4-02.zip
-            bcedb7c1b07a92a0f8a06b3e167871e622c28d1b6d19db82c5c0cc7a45153d83  FS-34.32-Emoji-V4-03.zip
-            07fcd77c1294378331a9dc46150b7088235cc1522200955e9b4f1141fc5d45d7  FS-34.32-Emoji-V4-04.zip
-            98cf0b5502d9e91b1da85257416f339e2d26eb6d30c9645be27c512a676f3768  FS-34.32-Emoji-V4-05.zip
-            052b50dd329d1d5a9eee0ce6ba55d1c5d111f91de426429cd12d4407a2697ea0  FS-34.32-Emoji-V4-06.zip
-            FS_EMOJI_V4_HASHES
+            done
             python3 tools/verify_release_assets.py
             test -f SHA256-ARAMA-SESI.txt
             sha256sum -c SHA256-ARAMA-SESI.txt > /tmp/fs-source-check.log

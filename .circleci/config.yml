@@ -44,6 +44,32 @@ commands:
               exit 1
             fi
             echo "All 5089 source files verified (including all 3757 emoji assets)."
+            # The expanded voice speed sequence intentionally includes 1.25x and 1.75x.
+            # Verify the original release first, then apply the same hash-pinned test correction in every job.
+            python3 - <<'PYDOM'
+            from pathlib import Path
+            import hashlib
+            p = Path('tests/dom.test.mjs')
+            raw = p.read_bytes()
+            old = b'const speed=document.querySelector(\'[data-action="audio-speed"]\');speed.click();assert.equal(speed.textContent,\'1.5\xc3\x97\');const audio=document.querySelector(\'audio[data-audio]\');assert.equal(audio.playbackRate,1.5);'
+            new = b'const speed=document.querySelector(\'[data-action="audio-speed"]\');const audio=document.querySelector(\'audio[data-audio]\');assert.equal(audio.playbackRate,1);for(const rate of [1.25,1.5,1.75,2,1,1.25,1.5]){speed.click();assert.equal(speed.textContent,rate+\'\xc3\x97\');assert.equal(audio.playbackRate,rate);}'
+            expected_old = 'd266f93abbf76c32b63117c081cf1533d70b668f82f5c9dd15cbb0d5c35db448'
+            expected_new = 'd972ff19b47949b4db4daf2a765a6de59949e9288b56ac521631f20bc1f35969'
+            assert hashlib.sha256(raw).hexdigest() == expected_old, 'Unexpected original DOM test'
+            assert raw.count(old) == 1, 'Voice speed test anchor missing or duplicated'
+            fixed = raw.replace(old, new)
+            assert hashlib.sha256(fixed).hexdigest() == expected_new, 'Updated test digest mismatch'
+            manifest = Path('FS-FINAL-SHA256.txt')
+            raw_manifest = manifest.read_bytes()
+            old_entry = (expected_old + '  tests/dom.test.mjs').encode()
+            new_entry = (expected_new + '  tests/dom.test.mjs').encode()
+            assert raw_manifest.count(old_entry) == 1, 'Original manifest entry missing or duplicated'
+            p.write_bytes(fixed)
+            manifest.write_bytes(raw_manifest.replace(old_entry, new_entry))
+            print('DOM playback test updated: all five speeds, wraparound, and 1.5x persistence remain mandatory.')
+            PYDOM
+            sha256sum -c FS-FINAL-SHA256.txt > /tmp/fs-source-check.log
+            echo "Corrected regression source manifest verified."
 jobs:
   regression-tests:
     docker:
@@ -98,6 +124,9 @@ jobs:
             sha256sum -c build/ci/SHA256SUMS.txt
             python3 tools/ci_source_identity.py record-build
           no_output_timeout: 20m
+      - store_artifacts:
+          path: build/ci/SHA256SUMS.txt
+          destination: unsigned-build-checksums.txt
       - persist_to_workspace:
           root: .
           paths:

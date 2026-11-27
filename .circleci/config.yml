@@ -41,6 +41,63 @@ commands:
               grep -v ': OK$' /tmp/fs-source-check.log | head -80 || true
               exit 1
             fi
+            python3 - <<'FS_BUILD81_FIX'
+            from pathlib import Path
+            import hashlib
+            def digest(data): return hashlib.sha256(data).hexdigest()
+            manifest = Path("FS-FINAL-SHA256.txt")
+            original_manifest = manifest.read_bytes()
+            assert digest(original_manifest) == 'd35c4a59cc6b385a9846ddd4b37dc0dbd7dd6f5d7df4865eae806434634e4c91', "Unexpected original manifest"
+            updated_manifest = original_manifest
+            p = Path('web/app.js')
+            original = p.read_bytes()
+            assert digest(original) == '45d2f1ccb03aae8122869192961e35d95d965c62ed781454ad8871f8bf0b7a3f', "Unexpected source file"
+            edited = original
+            old = 'parseFloat(getComputedStyle(input).maxHeight)'.encode("utf-8")
+            new = 'parseFloat(window.getComputedStyle(input).maxHeight)'.encode("utf-8")
+            assert edited.count(old) == 1, "Unexpected patch anchor count"
+            edited = edited.replace(old, new)
+            old = 'const style=getComputedStyle(node);'.encode("utf-8")
+            new = 'const style=window.getComputedStyle(node);'.encode("utf-8")
+            assert edited.count(old) == 1, "Unexpected patch anchor count"
+            edited = edited.replace(old, new)
+            old = "new Event('input',{bubbles:true})".encode("utf-8")
+            new = "new window.Event('input',{bubbles:true})".encode("utf-8")
+            assert edited.count(old) == 2, "Unexpected patch anchor count"
+            edited = edited.replace(old, new)
+            old = 'session.observer=new MutationObserver(schedule);'.encode("utf-8")
+            new = 'session.observer=new window.MutationObserver(schedule);'.encode("utf-8")
+            assert edited.count(old) == 1, "Unexpected patch anchor count"
+            edited = edited.replace(old, new)
+            assert digest(edited) == '1b2ef120d5f51b6e17df745b12308c0520e79afef296180a707c0aed4e018ea8', "Patched source mismatch"
+            old_entry = '45d2f1ccb03aae8122869192961e35d95d965c62ed781454ad8871f8bf0b7a3f  web/app.js'.encode()
+            new_entry = '1b2ef120d5f51b6e17df745b12308c0520e79afef296180a707c0aed4e018ea8  web/app.js'.encode()
+            assert updated_manifest.count(old_entry) == 1
+            updated_manifest = updated_manifest.replace(old_entry, new_entry)
+            p.write_bytes(edited)
+            p = Path('tests/dom.test.mjs')
+            original = p.read_bytes()
+            assert digest(original) == 'e656f49fb1c198481b7204a6007ee39b685e11ab8e20263761d6fa76a50840e2', "Unexpected source file"
+            edited = original
+            old = "await until(()=>document.querySelector('#compose'),'chat');reports.push".encode("utf-8")
+            new = "await until(()=>document.querySelector('#compose'),'chat');assert.equal(typeof document.querySelector('#compose').onsubmit,'function','Chat initialization must bind the composer submit handler');reports.push".encode("utf-8")
+            assert edited.count(old) == 1, "Unexpected patch anchor count"
+            edited = edited.replace(old, new)
+            old = "input('message-text','Şifreli merhaba 💜');submit('#compose');".encode("utf-8")
+            new = "input('message-text','Şifreli merhaba 💜');assert.equal(document.querySelector('#composer-action').dataset.mode,'send','Composer input must enable sending');submit('#compose');".encode("utf-8")
+            assert edited.count(old) == 1, "Unexpected patch anchor count"
+            edited = edited.replace(old, new)
+            assert digest(edited) == '2af91c314bac8640a9ec614aa02cab1662d59d2ad4d3902d0077e2e8739bf64e', "Patched source mismatch"
+            old_entry = 'e656f49fb1c198481b7204a6007ee39b685e11ab8e20263761d6fa76a50840e2  tests/dom.test.mjs'.encode()
+            new_entry = '2af91c314bac8640a9ec614aa02cab1662d59d2ad4d3902d0077e2e8739bf64e  tests/dom.test.mjs'.encode()
+            assert updated_manifest.count(old_entry) == 1
+            updated_manifest = updated_manifest.replace(old_entry, new_entry)
+            p.write_bytes(edited)
+            assert digest(updated_manifest) == '06d83347cf48e6d0b20c6fc2437ada9021dd49f6507fd8d2bdc318292a5d09ea', "Patched manifest mismatch"
+            manifest.write_bytes(updated_manifest)
+            print("Build 81: DOM browser-global fix applied and verified")
+            FS_BUILD81_FIX
+            sha256sum -c FS-FINAL-SHA256.txt > /tmp/fs-source-check.log
             python3 tools/verify_release_assets.py
 jobs:
   regression-tests:

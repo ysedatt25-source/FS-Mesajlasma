@@ -5,18 +5,17 @@ commands:
       - checkout:
           path: /tmp/fs-repository
       - run:
-          name: Restore verified source, emoji and reference UI ringtone patches
+          name: Restore verified merged FS 34.32 source
           command: |
             set -euo pipefail
-            : "${FS_SOURCE_URL:?Set HTTPS URL of the exact latest source archive}"
-            curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' -o /tmp/fs-source.zip "$FS_SOURCE_URL"
-            echo "ff3bfa30e21b0515d12093978540a9078a9a91358f570a74818eedc3dada4d3f  /tmp/fs-source.zip" | sha256sum -c -
-            # Isolate the source from old checkout contents.
-            mkdir -p /tmp/fs-release-source
-            unzip -oq /tmp/fs-source.zip -d /tmp/fs-release-source
-            cp -a /tmp/fs-release-source/. .
-            test -f tools/ci_verify.py
-            # All 881 original assets restored from six verified release archives.
+            FS_FINAL_SOURCE_URL="https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-34.32-Nihai-Dogrulama-v3-Kaynak-Emoji-Haric.zip"
+            FS_FINAL_SOURCE_SHA256=76fc4efb09db3c00d472980bd0f5a3455a2e929f71e1f1b0334fcac44ec7d280
+            curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' -o /tmp/fs-final.zip "$FS_FINAL_SOURCE_URL"
+            printf '%s  %s\n' "$FS_FINAL_SOURCE_SHA256" /tmp/fs-final.zip | sha256sum -c -
+            mkdir -p /tmp/fs-final-source
+            unzip -oq /tmp/fs-final.zip -d /tmp/fs-final-source
+            cp -a /tmp/fs-final-source/. .
+            # Restore exact animation assets from existing verified releases.
             release_base="https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1"
             mkdir -p /tmp/fs-emoji-v4
             printf '%s\n' \
@@ -32,177 +31,44 @@ commands:
               unzip -oq "/tmp/fs-emoji-v4/$name" -d .
               rm -f "/tmp/fs-emoji-v4/$name"
             done
+            # The six V4 archives contain ONLY the 881 legacy animations.
+            # Restore the remaining 2876 from the already configured, pinned old source.
+            : "${FS_SOURCE_URL:?Existing legacy source URL is required to restore extra emoji}"
+            curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' -o /tmp/fs-legacy-source.zip "$FS_SOURCE_URL"
+            printf '%s  %s\n' 'ff3bfa30e21b0515d12093978540a9078a9a91358f570a74818eedc3dada4d3f' /tmp/fs-legacy-source.zip | sha256sum -c -
+            unzip -oq /tmp/fs-legacy-source.zip 'web/emoji-extra/*.webp' -d .
+            rm -f /tmp/fs-legacy-source.zip
             python3 tools/verify_release_assets.py
-            test -f SHA256-ARAMA-SESI.txt
-            sha256sum -c SHA256-ARAMA-SESI.txt > /tmp/fs-source-check.log
-            # V6: apply only the reviewed test changes AFTER the original manifest passes.
-            curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' -o /tmp/fs-reference-patches.zip "$release_base/FS-34.32-Referans-Zil-Sesi-Yamalar.zip"
-            printf '%s  %s\n' 'bc5285558e1703b4653566ecc103f9a5af4b1b7fefc4a30bb342e309d474b6d9' /tmp/fs-reference-patches.zip | sha256sum -c -
-            unzip -p /tmp/fs-reference-patches.zip fs-regression-v6.patch > /tmp/fs-regression-v6.patch
-            printf '%s  %s\n' '032cb3dc01d558e8edc7559db9949f9ac0af72f628df8186a8fd5f61f17d5cc3' /tmp/fs-regression-v6.patch | sha256sum -c -
-            git apply --check --no-index /tmp/fs-regression-v6.patch
-            git apply --no-index /tmp/fs-regression-v6.patch
-            printf '%s  %s\n' '7e7e6c16e74fdd8c218047287a0904a22335a325c006a2ea315968f222435386' 'tests/interactions.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' 'd7b3b749ca57a026f40bed00abb483d2eb56f89b8b8fdefc2eb16fb08e473523' 'tests/dom.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' 'ad23b2a3be0e4a18c6ce6c6a1e973156af126b55d3ac16f08d8eb6ac85988a66' 'tests/ui.test.cjs' | sha256sum -c -
-            printf '%s  %s\n' '01d3e7a32daff868c1467350186f68f148afe362df8116a88a518de821616647' 'tests/test_call_voice_browser.py' | sha256sum -c -
-            # V7: production transport error/cancellation fix and current UI regression selectors.
-            unzip -p /tmp/fs-reference-patches.zip fs-regression-v7.patch > /tmp/fs-regression-v7.patch
-            printf '%s  %s\n' '6d551d43e003afd1d63c0042fb3df72cb40c2fa5c286593451d89c279b175a7c' /tmp/fs-regression-v7.patch | sha256sum -c -
-            git apply --check --no-index /tmp/fs-regression-v7.patch
-            git apply --no-index /tmp/fs-regression-v7.patch
-            printf '%s  %s\n' '91506b22b038d28f801cfa75bc14650f086b8b56c81efa32e2d295b97314bf02' 'web/connection.js' | sha256sum -c -
-            printf '%s  %s\n' '67f6970a087fae3edf4171c17a9296e410213e3b8be2b591de1289bd61e4f321' 'tests/connection.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' 'f1c02ef92d584e961a8c390fd04a0fb08c00651b081035ce69776bc4c20c27e7' 'tests/ui.test.cjs' | sha256sum -c -
-            # V8: current download fault endpoints and accessibility-aware real emoji test.
-            unzip -p /tmp/fs-reference-patches.zip fs-regression-v8.patch > /tmp/fs-regression-v8.patch
-            printf '%s  %s\n' 'cef3a296df530da159e3da3ebd254a8be1987ea072244e657abf3aa52720615e' /tmp/fs-regression-v8.patch | sha256sum -c -
-            git apply --check --no-index /tmp/fs-regression-v8.patch
-            git apply --no-index /tmp/fs-regression-v8.patch
-            printf '%s  %s\n' 'bb04feb85adb8a7766ddb6c397c6503338c7c3303ee9b5a522088d03735afda9' 'tests/dom.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' 'ac82b764c2ab997adc70c9073c89967f03d3d32a720828b6d4d5fb8b7a8dc0ac' 'tests/ui.test.cjs' | sha256sum -c -
-            printf '%s  %s\n' '5c24ad717366ef5d5416ca8f4c1d03536bf6db036653df4c1174f92f401be1cb' 'tests/test-fixtures.mjs' | sha256sum -c -
-            printf '%s  %s\n' 'f576b9d1ce1b2bdfb950c4075366be93058d9d0f23419e51c260a7f0dc31b05f' 'tests/test-fixtures.test.mjs' | sha256sum -c -
-            # V9: explicit device-key consent, accessible poll target, integration-first gate.
-            unzip -p /tmp/fs-reference-patches.zip fs-regression-v9.patch > /tmp/fs-regression-v9.patch
-            printf '%s  %s\n' '835193036b2f0b319c7217af97e192876225755b32804199c70b7d40f6ad1eeb' /tmp/fs-regression-v9.patch | sha256sum -c -
-            git apply --check --no-index /tmp/fs-regression-v9.patch
-            git apply --no-index /tmp/fs-regression-v9.patch
-            printf '%s  %s\n' 'ff053596dbcfad036a05b9d476b951bc56f40b2133cce96f952af67b46aba2c1' 'tests/dom.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' '587c8e066a561ef6f5a66a099e7a42371ebe9d10c7c8d2f140f19df2feee31dc' 'tests/ui.test.cjs' | sha256sum -c -
-            printf '%s  %s\n' 'ebad359695ec1cb826a8fe2b5435a8e6707cf7cdfc4b9b2d7101113629791017' 'tools/ci_verify.py' | sha256sum -c -
-            # V10: checked-exception handling in the actual Android call alert and server deployment guidance.
-            unzip -p /tmp/fs-reference-patches.zip fs-regression-v10.patch > /tmp/fs-regression-v10.patch
-            printf '%s  %s\n' 'f947e47ee8b53f228bf7ee07555b5f7d4075446cb3a89e089a5f36ca9e82251e' /tmp/fs-regression-v10.patch | sha256sum -c -
-            git apply --check --no-index /tmp/fs-regression-v10.patch
-            git apply --no-index /tmp/fs-regression-v10.patch
-            printf '%s  %s\n' 'accc851c82e513e54122a945c4b0075c927d946c412bfc5e91c9971177413ffc' 'android/app/src/main/java/com/fs/mesajlasma/CallAlert.java' | sha256sum -c -
-            printf '%s  %s\n' 'c0f8ab1f34d2768d157adf5fbc859729481c56b99c71eae6d25ad7a02fda25d3' 'deploy/plesk/fs.env.example' | sha256sum -c -
-            printf '%s  %s\n' '1c98b081621fd9a5142dfbc7af4b151230125a1da9ef356d57921ae38d9b99c7' 'deploy/compose.yaml' | sha256sum -c -
-            printf '%s  %s\n' 'b034f333210fab03bcc340caaebc807cf5aefdbd5f26d548b42f10e092c910b3' 'docs/DEPLOYMENT.md' | sha256sum -c -
-            unzip -p /tmp/fs-reference-patches.zip fs-reference-stage14.patch > /tmp/fs-reference-stage14.patch
-            printf '%s  %s\n' '71d4f3812de1a2e2665e9ee155f63eae24a01349d96af927ef35193ad977e0a6' /tmp/fs-reference-stage14.patch | sha256sum -c -
-            git apply --check --no-index /tmp/fs-reference-stage14.patch
-            git apply --no-index /tmp/fs-reference-stage14.patch
-            printf '%s  %s\n' '632d64ea7cb282fc0b289bcfa19a9785bb52ecfa1b7a03b12dc6e17f7e844c3a' 'android/app/src/main/AndroidManifest.xml' | sha256sum -c -
-            printf '%s  %s\n' '452012d6a22f1c17e8b62113467e9d7b7fa7bacb35ed8df55532473201f01fcf' 'android/app/src/main/java/com/fs/mesajlasma/ConnectionService.java' | sha256sum -c -
-            printf '%s  %s\n' '68e2779bdfeae1b10db2ab3770deece8cf04313b30c54619873a260d7fb388c1' 'android/app/src/main/java/com/fs/mesajlasma/MainActivity.java' | sha256sum -c -
-            printf '%s  %s\n' '2016872bf67b175aba09690e54a20c71a0a7272715d84b696a721b4f2a49c2c7' 'android/app/src/main/java/com/fs/mesajlasma/MessageAlertPolicy.java' | sha256sum -c -
-            printf '%s  %s\n' '92efbaf12d87d788f5efc12f6adb5db625269a9ed9b0995009690cbd3682c0b3' 'android/app/src/main/java/com/fs/mesajlasma/MessageNotice.java' | sha256sum -c -
-            printf '%s  %s\n' '0d6bf7675a1d995213f0a56ef2fd00fe9d8bab9d4899eff6c18f0be8821582a7' 'android/app/src/main/res/drawable/ic_launcher_foreground.xml' | sha256sum -c -
-            printf '%s  %s\n' '6ecbfc2d7ca85eb457be92c22bb1d6ccd37e523e114394d7d9f9570eddc19f85' 'android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml' | sha256sum -c -
-            printf '%s  %s\n' '81e43849548dd87184f46e368febce8389500d9986eb608e028fa86ded53087f' 'android/app/src/main/res/mipmap-anydpi/ic_launcher.xml' | sha256sum -c -
-            printf '%s  %s\n' '9eabdd40d502b33886bbfd22638055d627187132f7080cece228017440e84411' 'android/app/src/push/java/com/fs/mesajlasma/FirebasePush.java' | sha256sum -c -
-            printf '%s  %s\n' '543bf257895785d4fe71dcf8d04dd37481e19b60c1b26b0a5f55d76612115dbc' 'android/app/src/push/java/com/fs/mesajlasma/MessagePushWorker.java' | sha256sum -c -
-            printf '%s  %s\n' 'be65af376e02802c68cbf0b7e7ca17a480ca8182f7d953a6af19aec19be7c80f' 'docs/CIHAZ-BILDIRIM-PERFORMANS.md' | sha256sum -c -
-            printf '%s  %s\n' '5bba2dadf90c0993c010380574fb88a0f43d015070872f3aebe224a2d7e0407c' 'server/app.py' | sha256sum -c -
-            printf '%s  %s\n' 'd2614b6b8e018e7d147ff2857c26def8e553765019750598f3d47ff662c2ccaf' 'server/schema.mariadb.sql' | sha256sum -c -
-            printf '%s  %s\n' '19a14a136cb38e212e36ac195f978180ceb8b11a9189475ed37f37b82ac69b27' 'server/schema.sql' | sha256sum -c -
-            printf '%s  %s\n' '19cb940dd1525f20c9d19196e85dc0e7c32a039b3e1a896db1da22542374bea9' 'server/stories.py' | sha256sum -c -
-            printf '%s  %s\n' '0728d4f43659a9751301a7a171d54f0f41419fed900915ee1e3d0191b19c333f' 'tests/audit-route-guards.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' 'dbbdb54390529d7a2aa4c603d5b061f1e0afa70ff5cdbe747c3919883c0fbac1' 'tests/call-history-card.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' 'd266f93abbf76c32b63117c081cf1533d70b668f82f5c9dd15cbb0d5c35db448' 'tests/dom.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' 'af61cb436a6a72c0dcc470ea7d63e9064343fa818c55f1e475aa84f40ec77f7a' 'tests/emoji-choreography.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' '66d615b209e4aa7f85fabfac48f9a490a5843e326f920e6c2c94d7507ff58db7' 'tests/home-reference.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' 'bf5f937ccf0f0edbc5962a4a0d640e1dd98071d21eb6c2ce4ed97c1d1b53ef6d' 'tests/home-search.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' 'dec84cfaad319047bdedae5a65cf1e84e68b17ca21b85e4c0afb454fe6205d57' 'tests/message-interactions.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' '4b7ec9badb491fb52c9b33050890c9a2bc5a234ec298d5edeb92d2cf3f05e7e6' 'tests/native/MessageAlertPolicyTest.java' | sha256sum -c -
-            printf '%s  %s\n' '2b230d119805bbd26530e3e1dc9755195a0824e602ec4f06718a74902edeb359' 'tests/notification-actions.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' '5842711acb3071020b7f398154d44425e3d943ddbf285b8e0013369c5951a985' 'tests/realtime-emoji.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' '279599c2c835dc07dcbedd8a1204f00b8b28fac6a6deeabdaa35e21b991f38ec' 'tests/source-lifecycle.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' 'f0352a57dc6b386b8e35681f69db899739e2599cdeae6d579a907d254b8cb815' 'tests/stories.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' 'ef4d1435f7b026a4fb4dd49b2b9cc41cfcbc5c288350b07d89830c2aca661fa3' 'tests/test_chat_layout_browser.py' | sha256sum -c -
-            printf '%s  %s\n' 'a38d42f0dab706d45aee6052a9ec362458424a3ac2108eb87a60ef49d524e182' 'tests/test_chat_viewport_dom.py' | sha256sum -c -
-            printf '%s  %s\n' '553136c82db739825b806f298e5d210227f00cb4c57a222315504865376bad58' 'tests/test_device_performance.py' | sha256sum -c -
-            printf '%s  %s\n' '51c733f8d19e4623325a0ab425b02d91dc818a6815cb9739774fdc29968686a9' 'tests/test_emoji_choreography_dom.py' | sha256sum -c -
-            printf '%s  %s\n' '9c46bdd973c8dbc526305135cb13e903422ee58c90f03aa380a96abb16c59d1c' 'tests/test_home_performance_browser.py' | sha256sum -c -
-            printf '%s  %s\n' '2aac0463fb3eb560cdc4f1ae2b178350b73ef80c2126217d90b6ea090452b56d' 'tests/test_home_reference.py' | sha256sum -c -
-            printf '%s  %s\n' '4861d776a4785fdaf0a9419f0af5acc5662399688d37ca2848901f9925c4b246' 'tests/test_home_reference_browser.py' | sha256sum -c -
-            printf '%s  %s\n' 'c71ab697dd2aac79657afedab94f27f538662a5f23bc9a8f2030c496ccb98515' 'tests/test_madde10_call_screen_browser.py' | sha256sum -c -
-            printf '%s  %s\n' 'd7bfc4478d30aadd3467b8a12c1aab73ed180782f2981b9510089662c49684c0' 'tests/test_madde13_ui_browser.py' | sha256sum -c -
-            printf '%s  %s\n' 'd38964e3f3d11a1762a3a46aa3024bde9fd4c5b5905dbad2f89112918a6bf631' 'tests/test_message_alerts.py' | sha256sum -c -
-            printf '%s  %s\n' '10be84e010f0825f18ebcd94da4d6dba16a2c98b6a61a58799a1aae13ab45fee' 'tests/test_message_context_browser.py' | sha256sum -c -
-            printf '%s  %s\n' '09e26eaf3b852571ee2b0b06964b9febec9fbbc6c16bc54c027ad5a7985cb709' 'tests/test_message_delete.py' | sha256sum -c -
-            printf '%s  %s\n' '9b5409c51cc505c2b8d99effacea91137d3fc7ffebbdaa20457a4198197f5d95' 'tests/test_message_delete_browser.py' | sha256sum -c -
-            printf '%s  %s\n' '1be7e6194d8dc1a1914e36a95eab7f47498b6ef08dbff27e677c7cd77454276e' 'tests/test_message_push.py' | sha256sum -c -
-            printf '%s  %s\n' '873e5a42f44ba3bfc98baec2a41da19d816b516e55a6cf9a96ee13a2dcf3c53a' 'tests/test_message_selection_browser.py' | sha256sum -c -
-            printf '%s  %s\n' '7cb43b9e3fac3ce1cc0165ada0d3537b7303622babf72d6c0c630c3b85e2b22a' 'tests/test_photo_viewer_browser.py' | sha256sum -c -
-            printf '%s  %s\n' '63a26664c74e00c9abcb7448b7518765316d704a04a2fc9ff55de10c36a38945' 'tests/test_stories.py' | sha256sum -c -
-            printf '%s  %s\n' 'e0aea2428f4ec107d31a5491c0890b6caf4eaf5433b0341b54339875ab307955' 'tests/test_stories_browser.py' | sha256sum -c -
-            printf '%s  %s\n' '8e1e2e754a5db332dd036e2b67e3011f4c09d696e0c9a9a7c6897c32371e34dc' 'tools/ci_verify.py' | sha256sum -c -
-            printf '%s  %s\n' '97de1150f94d3a9cd318d7571c9edf010fe42ce48474f5267fd4118d39675081' 'tools/device_performance.py' | sha256sum -c -
-            printf '%s  %s\n' '3c48075ad1c73e092c0dd6a48e4fc11e7ce72cc1bc02518fa071c1f40e46d8cc' 'web/app.js' | sha256sum -c -
-            printf '%s  %s\n' '8179df4a64a153d80e1fcfd24aed4149b6a925be51c081cd94c865e9e47e3179' 'web/call-history-card.js' | sha256sum -c -
-            printf '%s  %s\n' '8424343ec1ab71cdac46a165aa2c892cd2cc32ce6806c4749086c0028d3ec6eb' 'web/chat-tools.js' | sha256sum -c -
-            printf '%s  %s\n' '0cd36ae8672fdb1bda27254310c19436e0425977efb68867f4b3f927058cc1e2' 'web/emoji-effects.js' | sha256sum -c -
-            printf '%s  %s\n' '7f261d807048294658da300e1f0e62e6e38dc00110682a66a3c11d8c403c1dad' 'web/home-search.js' | sha256sum -c -
-            printf '%s  %s\n' 'bf7e7e393f291d7a9864cf0ea05565d03c374e98390cf85d8b5275bbdf15adb5' 'web/icons.js' | sha256sum -c -
-            printf '%s  %s\n' '00531a6ff7aebef5ca8ef64f2fffb0f14252c2fe3b5445fc147cb6541823cb3e' 'web/media-preparation.js' | sha256sum -c -
-            printf '%s  %s\n' '97c93af8ad843a22e14bc0052fc238ab970d7b177c7fffe8b15ef7b5947ddb69' 'web/message-interactions.js' | sha256sum -c -
-            printf '%s  %s\n' '0fe1fdf34e21cf43fee66f77843d184273e2e185cdcee3f4426c30229f41c8ba' 'web/stories.js' | sha256sum -c -
-            printf '%s  %s\n' '5a3c588672f0be35a74f5c9702888b835e4b34a2acdcc6452cd75c0bc4e413ed' 'web/style.css' | sha256sum -c -
-            # Long ringtone update, applied after the verified reference patch.
-            unzip -p /tmp/fs-reference-patches.zip fs-long-ringtones.patch > /tmp/fs-long-ringtones.patch
-            printf '%s  %s\n' '4b7f6b0118a14917b20264e04bfd19a7edf0d042b265745d182d1e2208ea886f' /tmp/fs-long-ringtones.patch | sha256sum -c -
-            git apply --check --no-index /tmp/fs-long-ringtones.patch
-            git apply --no-index /tmp/fs-long-ringtones.patch
-            python3 tools/generate_ringtones.py
-            printf '%s  %s\n' 'b42521d6c8bf49de93b2b40058ec3a0e79108b744afe35b89ae18e597b68f734' 'android/app/src/main/java/com/fs/mesajlasma/CallRingtones.java' | sha256sum -c -
-            printf '%s  %s\n' '077f488e62189eea2872597bdd763b9dd59a1f7ace527de8ccbef1417da9e03a' 'android/app/src/main/java/com/fs/mesajlasma/MainActivity.java' | sha256sum -c -
-            printf '%s  %s\n' 'b5e1f53e104c89065065ccb799e7808c90dbbb402803f8c99ce738b960a574d1' 'tests/call-ringtones.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' 'bf6111a891a2f8e7842e1ee8831e1ef0972d92ef2bf454573cd531de62fca08b' 'tools/generate_ringtones.py' | sha256sum -c -
-            printf '%s  %s\n' '294b9f49bd5265bbd3fb25c53e9ea238256fee6d3dfd3c6b3602aef8bbc69d6b' 'tools/install_bundled_ringtones.py' | sha256sum -c -
-            printf '%s  %s\n' '9a82c01cdcd2d419a2394b92839c28a4435687f8c4da9bb5755c1a7115060806' 'web/app.js' | sha256sum -c -
-            printf '%s  %s\n' '9b04e3faf2a56c127e444f7da22b38ec69f6359a2c98d6d437f1b3b47bde3d25' 'web/call-ringtones.js' | sha256sum -c -
-            printf '%s  %s\n' 'af7e551bfb8bd8b4bbc3007390118417b9669ccd89f98987d2da86b70b4efa80' 'web/ringtones/aurora.wav' | sha256sum -c -
-            printf '%s  %s\n' 'c6aff8d84fbda8a49d97babe7a0c8e4cabfd0c85f255068718cc0f37514dbf5d' 'web/ringtones/classic.wav' | sha256sum -c -
-            printf '%s  %s\n' 'baecd6695324b77edf08d3163d339ebc2fcf8dcb8d789e66d9c6c705d1d23361' 'web/ringtones/crystal.wav' | sha256sum -c -
-            printf '%s  %s\n' '4b550e57987722429cdc0528f804e20101ebf0b37de74c30bbc45b2009903502' 'web/ringtones/pulse.wav' | sha256sum -c -
-            printf '%s  %s\n' 'cb2f1134f89a82a6054dc50b844dd8fa04e2b4a15d0b6c43b84d636dccb53edd' 'web/ringtones/soft.wav' | sha256sum -c -
-            printf '%s  %s\n' 'af7e551bfb8bd8b4bbc3007390118417b9669ccd89f98987d2da86b70b4efa80' 'android/app/src/main/res/raw/fs_ring_aurora.wav' | sha256sum -c -
-            printf '%s  %s\n' 'c6aff8d84fbda8a49d97babe7a0c8e4cabfd0c85f255068718cc0f37514dbf5d' 'android/app/src/main/res/raw/fs_ring_classic.wav' | sha256sum -c -
-            printf '%s  %s\n' 'baecd6695324b77edf08d3163d339ebc2fcf8dcb8d789e66d9c6c705d1d23361' 'android/app/src/main/res/raw/fs_ring_crystal.wav' | sha256sum -c -
-            printf '%s  %s\n' '4b550e57987722429cdc0528f804e20101ebf0b37de74c30bbc45b2009903502' 'android/app/src/main/res/raw/fs_ring_pulse.wav' | sha256sum -c -
-            printf '%s  %s\n' 'cb2f1134f89a82a6054dc50b844dd8fa04e2b4a15d0b6c43b84d636dccb53edd' 'android/app/src/main/res/raw/fs_ring_soft.wav' | sha256sum -c -
-            # Direct-call feedback hotfix; all previous verified source checks remain mandatory.
+            if ! sha256sum -c FS-FINAL-SHA256.txt > /tmp/fs-source-check.log 2>&1; then
+              grep -v ': OK$' /tmp/fs-source-check.log | head -80 || true
+              exit 1
+            fi
+            echo "All 5089 source files verified (including all 3757 emoji assets)."
+            # The expanded voice speed sequence intentionally includes 1.25x and 1.75x.
+            # Verify the original release first, then apply the same hash-pinned test correction in every job.
             printf '%s\n' \
-              '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' \
-              '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' \
-              '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' \
-              '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' \
-              '/505Dnm8YE8o9Sm+3MS98jve7MVlebC8SOJHA1LWeZPSDuYBUc7ikxUeKkWNlfgbnDoZl+PQMBoa3BrS7PGUejHOIpIIzB6OHvyWlE62IlV4HDLQr0iW786SIeYKpDREezLyMrHZ3k7xFqTbJP1///Z/23dVcZjT2KZvA5uh5Y1BHmRiRZUyDsG1q3ALBdMIUQvUCmjkDBbQujjnQfLp53QaeTGlFnfvh6nWARZC/Ou/exHh17UeMWgNRTVs36E+tiXBOVdDgkcN9unnSKPAI/pQsff9dK0DfhD7WcGRzNklaVRHyJINnlMi846KpMx532lxFek9ra+/eP50bQiysSGeDobPm7yne4Do/tM91Wg3EBXJK/KgpB4BJYDrRcWyl9QYWXEHDqdx4XqXhy7EnMTM/DyyMSdOadgMs28ziB1w8QJsHAAEZQoki7wBREskn14qSM0OvStabDUGaXKDORi2x0f46ip3513v7PiwyMjsKS25XuNclbN+gH0BLtPU6wcixXN8EE5ZdndX/eg+0FL8JOJ+Pr0SMbDIZfgTNj7763/y708/hz8BAKkz8sjl+Ko4fmtiMlYK7vYmDsWc4fVMuRjTL7pWLeMCPLR+Z9l4/pASlajCjM/ncsJlezyFLpBWYD6IXpwo2ia3osr9eeRkQPGGYTcJCy/eYCN5VLl50Br7ywm+5IxNUZ6TgInODBy4MaQbIeARKGQSVV/QhBOTGSc7h7glFOBEayx04127GOtgBnEPp1/dXqGc3uaTCG2bPWxnLHKPbGdthFDHyaYDL029W3PV3tBvYbDbp/tv37YbWiAm7/bj/On6wZ65vmHZ6+urmD09V1Gy4MbGCtX4auOrghurXW9slJXWLSdLxsK8dl9fL+EFX4ualPVpV4gauNxAmwsS2SiEGOLWpxP36Jd0MRMwK2dnINBbMOi2MQM4bzqhOQFDildkxdNJZTay1L9/NjAMhbBjjvpg9fLhy3ZNrgCcXagllQn5ntfy35sy6bLb1CgcGu9N8KVvJ8KAkRstZbZb7y3j/ex99lUdLJ0Mem++txrh8fLMcBrzZTWg2NA1OX+fve9dzIA9VlfvmvC8B6IkHzyHGu7rxa2pPTk1PG0k4ahWeQOS5w0lPAN16fl4MAClCaiNRyco45T9GuwQgrtczlgkcsp+zdzVLU0d8wmOjNRymt25Iw+iwIy0kpYprtAEJVTROIM0DC5Ba9zZemKtVpt6XFlBBUQ6hw6KzGjtjs1nTViovr1WDyMYSSVGawpYMjHLUIvrnK9ecBZp8CjIPGyHgr7VCt0RHhEzFT/KO4vUbVcCB8/OJCZm0KYQBebS5JWGCYnO7W1qVBLfl3ZgjmazqoY3Z4gIWwO8OhQC/DATptm3Uyhi2G5q2TJzFm0E0lpR+s6eJXxSiEAwEjAfmBJLl9LIicROyLcjTa/3lLqv6T5SUgk5/K6rToZJk/Jwr76atWr36DB8cffa5ElZYTVWiAXEAgMMg8DmoIQMknwEs5PR0ayMHA0SGnhc13OLtdwXXajyaMVodxcc5unO16wftGlUSXZXP9/yvjzg0lRzPmEdYTanrMveFrjA+FdbKe2jIqY03/seP+oewDXPf+Y98xvvAbwXuH7FHy0XFtf4oRSHiW1M4zDHxsUTgsRpVBh61u6s2wYhVk2c/SxB3g62GdgZlO0AzdQGGvXRE/m7iasBdbZP9s9oeb94rFU/E166CwHj4haqBjcaNVYcqf2ZSzxBmDbWUQ+1zmmHAE9+yn0TEQ1t3n+2+QSR+5acQG2D0JMb11jX8aMQj5jeZH11dxOvSmcyS3KLauHFw9jbDhtN04N2CUCtbyd61cRYTL/GFECEcC5/FjuFmdrl21K5Nq6poNB6wLVgQDnfNOauW9Z5mZdzITEj2diPzabUF1X5ITwbNr4IOH6d29iUO170cWfpWPBq2SMGQR1KQrSLg5ZefVrR+tCE4uqTzd2rbesixtUmVsGZm937tkzYp89c' \
-              'qj8ysSvLRpTdWX3kzTu5Jb7EspVsjD5nY/TRNPdBM/fpIlYalI4450u0AZ8+J2X0KU7qr66utbcq7FpyOmdIlDAWzcNj6XD/kAt631mUMYrL/Rura1r/lBGK80SLZLIKxM98CgTC5HOTUZQTWSZybKy+smx+6N/3cGC3b9JE7pD219afthfVk0AGySXgjs6xdaFR+0FqId/Vh1IOW41JG7tcLZQT1UD4hduFNe7j7i3ojISmIl1HCYm5vgesdhsfywZKoEoS6StzaoB04Yu4dh+Q4wbJF9eFbONXlSRDP9QuNczSXEZFAzK/ckS1Ufwa5aQQ1dbRfltkPnNqSmRwmUvH6BTTgDJT+gmOvKGSPFpr896BO2vP/t7svKevs59X2LqZ9PdYrpEXX6KH/IDt+kJrJXv5zInU9eWrZpNBprRPN7uTkZAbH3NmokGhk0vMUzEWzfQfFOaMejgRlG9xrrwSPj7G2SiVsz7zRonxfNAo2ejW/LcQYLXgruGCqSlMnkpiVMb3+dJBNUanRhkCSyx50XE3noOL/8UDXMgPaq2IDR0Hplkf3fa+3Ci6z4MoWn+O9zD4cp94IH1iGTMPFrrCg3tcYdV2wezWZWHQpA0UAX5rfVD082UaoRKVlmuUECaWP2Rw+fT581Uv8Bzn2WBVvAiG1c0WrTqHmVoBvWnmJb1p5iVnVqkMj7M/n+wffdff+2Hv6MzmJaAzSpivZIu0nK5Mo2fUAWarzFSZ+Ql8yfhNExLIYeh/B8wM4UcJQlXr8DGCGpC9w+M/7ktEaM19vzxxYFPwLzK9iPvRSv5Ex3rL7lJ540GHDjDUertk5PiEsY0bzLe9m3Ai3goR4OoBZjAR1B+8aCpsPFp1KkvsMFNfd5PpIBJn3qSovjNKQl9kNr/eAgqOJ9qPU7Ahovy5F1yKXi4mtsxw+t7Ldvlkgio5FPH0BPe+x4imLJQXuSNkedN7NeEGxq4OHWinNuSkFUlDfuSNJ7ae4QPuBnD52yjxcKOc7rKwB0DUaslcHhB8yjP7Nib/HiR8yo12o+aShFACd/iCKLq6lQr2MNnwkKfYntt71xhoLoOopSUr/W4GtDBTatEQC65FVKIdeApQ4S/etmSjZnsX44Ig90/XPsmbAvZRbwC/eak/kkWZHSGQXe/WzpPLy0jsB1rv2HGeJFG94x/CNAfFVsAwYoB54KG9Kltfc6VOBGjV2ssrmujiEp1L4WeHn3mlSqDEkafPX2LOHH1qB0+KPRCVOiJ2SvKaYpL4I/smk1f2YO6hXN6u+LRgzcxW1XltURKIrE3qx8UFV1Tymbq9mKBby8uoA9lbcF2Xd6iWl82lm+zjR37ElhIe3mQMFi+mYRjq/mOjvD4IHjKQN45M4MArS6hEnRtZXpZovnE0T7koddiuFdjI33yNRLEQyI1kX4ordXg6CVhnuPOJMNXmxfBkfddtoZfRsmZMaTpxRJtVvfAyLj1+1vC19+HMgSKPAmAxR2y8ek4csfHqhf2SXpameKG4d53flKa7CPeyCWOvDi6bSw2zXZ3SJZpSdVl80XYYTbPR8TQfJB9MfI0NeuW0D+C+RmomkXBuvDQ2WwnVafHmiyOVtFVceG/cFa9H4s1DIgJg3FpeHjgoNVDA+KB36oSBzowa+9R1kFnWsgfqFjw17PKZTG6BTmtZKND/klat4Eq9sJItgzttNagtPWOotVV0PAESFOO08E5imiP5jrYKVQyTqWDAPBgVOhgfPxqVDVfSo+w7i6BlLC8bOqFUygyWD6S0UDsNaylDlrGAkwe0I7NA4BFp4gMDGUHjS8UPgu+kEjhJLRu38Ap2kArw+eoaOmzwudGoAGkSiFR8VZbqgzzdJ8VZmP1gsxwU+Npv/PR2kicOTEYAhuPd/i6wrP6KjQ69YGOTcj0YDMG3+fwHZ5UZ1cm0mZ/UszrzSDCV7DR5OkClLrE6lKWSvTYNxkFS45X9Cqmxtm6vPZ4cdzQbeXprzIyM521mIJds' \
-              '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' \
-              'qAja4ahnyrDSoGKX6VsUIPOngTtjr5cw4uVWQp6/0rDo611BCW6HkvlrMFMLbX9HRMnHw688S67iHFOt0MkGIGFcT82vRAtqqF2zYjQ4Rza9oIDDZ/nuDRm5xW+cxoNClWgNX3FBWPGQ3Hgrbm5lLrEB5BXlLQpLJad6biEkZnvBIT/0SqkfIpfrbXngxiQT+QYJ5zqJIGR0nRdb9djcc1AlF7H4Qmp5JZ+rhUye3OJlgPx+j4Jd1NETk19N9TsYSlnXVXWXl0um4PM6tHQgB/zYBsV75z+LceiFXr+KecrXiSCWCCd+WAvVuipe+aVNJErZXent8Tk5Ov5my+vokI6ACxPljhy1/w//Tnfsn4sAAA==' | base64 -d | gzip -d > /tmp/fs-call-alert.patch
-            printf '%s  %s\n' '1d4cbfebecc930c2e97b32b922ee6f26bd19150c1ad2f9af65cc0201fb008426' /tmp/fs-call-alert.patch | sha256sum -c -
-            git apply --check --no-index /tmp/fs-call-alert.patch
-            git apply --no-index /tmp/fs-call-alert.patch
-            printf '%s  %s\n' '2c49726a4d08b6a2440be0a6868bced1ad114eb2cb8f11b94f1f555cfb960c6f' 'android/app/src/main/java/com/fs/mesajlasma/CallAlert.java' | sha256sum -c -
-            printf '%s  %s\n' 'fb3ee995719db28fc9054cdc1f9cf345524166d2ed9d69b8d5f9cee715f44215' 'android/app/src/main/java/com/fs/mesajlasma/CallAlertReceipt.java' | sha256sum -c -
-            printf '%s  %s\n' 'ee8e6b4d5a408c163235c1e2fa06c60c869120a1de4e9f37c0aa32fe36e8f3fc' 'android/app/src/main/java/com/fs/mesajlasma/MainActivity.java' | sha256sum -c -
-            printf '%s  %s\n' '22d55d5a4ae1977328ea6a05db47d4b382575ca2e1f8ad42fbe264dd7e7e27fa' 'server/app.py' | sha256sum -c -
-            printf '%s  %s\n' '8cdd2a794bbc574b860fe43e86965234e508701e1f1657dde414754bb801cc6c' 'tests/call-chat-fixes.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' '26cf4445def9b9a072514590107e6b25374f203c9000f3c4302b1b8030213a45' 'tests/outgoing-ringback.test.mjs' | sha256sum -c -
-            printf '%s  %s\n' '804f89d390283de7177d8a430a47b7ec3725cfd28e52229f0f9c45641fe0ab9a' 'tests/test_call_alert_ack.py' | sha256sum -c -
-            printf '%s  %s\n' 'd1903b6e9bd4ec0f61e1d6e17a0a7cd92b9c60e20f14d7b080ba8aaf88155910' 'web/app.js' | sha256sum -c -
-            printf '%s  %s\n' 'e13e11b5699b155f43a2f1102121277e84399174beb08612d0078079bfafd92c' 'web/call-chat-fixes.js' | sha256sum -c -
-            printf '%s  %s\n' '1bd1d76ae37c8463d6ba1d8f4ad9155b10c159d10c663c7f84a3f125e0120b71' 'web/outgoing-ringback.js' | sha256sum -c -
-            # Story picker hotfix: retain compose only while Android system file chooser is pending.
-            printf '%s\n' \
-              'H4sIAAAAAAAC/+08XXPbRpLv+hUwcmUASxCUYsVJREMOTdEKL5LIIilnt3Qq1hAYkohAAAFASQzN35LHPOflnvYt2f913T0DEPwQJW1uU7dX3qrIwKCnp6e7pz+H63rDoVIuj7xUYRUWuHHouRUWRZUkdioT5gWVH9gtqzjhpDJMKhOesB98lkxY5Ry+1ZzUu/XSmYUwyuCPzd/zApffKy4bfjngrmUxvv/VF59z5WB///Xh4V65XP6jFO6VSqU/TOU33yjlV1+aXyol+guv0XTge47iwIxEKU5Q+H3KAzdR8oH5nqIo3lDn9xFM8VJj3gwAJFU8O+B3injRJYFWFIe3nstjq8vT1AtGiVWr95qti36t3e5ftHrN9816jQa6jV6veXHaNaqeFU3Txn0asx1oGn/tdWqEpV2rf1c7bZgjnraZc8NG/IJNuG4Y1SRlcZoRrntGdQG0439R7N2ylCsAkMK2h17AfKWbxoBZaXWap80LWx2naZQcVZDFwBSeJpYkJvJZOgzjiRXwVK3ulXNstanrhSf81nN4nfn+AIhR2HIsqa5CnrMAaI2tVlAPJ5Np4DlATBhIBGMWjLh75iXATh4rThEkG10ifBeHzHVYkna4w71bmJA4Yfa8BBuEoc9ZoDhAHtFAzOGm4vMRc2ZdnPPjlAN211QG/pSnYZiO2zyeeEkCC7dBFYBHS4S3ITDD85eYc0T1MAi4A4i2AEtOE2/aMR/ymAcOt1U2TUPVlONiKVtVN8kngA+gD2GByvcMUBdW80AlCfAUWUV8M5U4nKa8lqZ8EqVLUCH/b0G+PnCOJskXUmn5rJ+FYQTyAj3DEyLeUM1yPN/zwQcPJtzxwXJwyT3JWyUSW1t+qGawHxjsJtOdN5exd3V9DNT5+VgOecpDPxTasMSTWLnejXi4MUeyHT61Ym/kLZeFhUAlJsAleFoH9wI4PbRQD2zB+le5F1KmDjI3B3iPkk7YLc+UZvvM9jhMM63boSqkp0XYFcUQAjxn0RsBb8I+jpUY' \
-              '9D9I4TEhMYJGOtMYVC39liVjBD7WjeqDKLpjFnMXd3GsJPS8A8te6ZMV+GQF/pesQM6hT+bg39UcbIQYIrJaIlHm9BeFWZWbmngTbuLOQBX8EAYS7yf4mE/RxQwzA88emDFHNPawihjsSVXgsFl1gbHONy04/DEckyzIu4UYRgmDesyBPv3dFNVaGRjzZIp6nX8YGFXmD6aTxn0UxilttrZ810H/Ye8Y63V4Evq34hAIKSPJ70PflSeHiEd45oz5iQeApjpMyoKLqph0da3ABLsw1fLBvuGnBBgK8SYMvrCDqe8bEHxJXhzBoAHfhhawNz0PXW/ocVc33nRnYL0mlhRND/hy7vmAUDfKr17v4/+MoeVyn8NGjSrQ9j1E7uGdblgQ6XVBZNPkHYvrcKhiff9+ODx4ve8eDDYgL9itN6LDsBUaLAAxQFoEPR17CWw3hrN1xmZwPMAShYK1hUEJhp8s5ro0EzCZa2CW+KfNYCjRywdm+QBD3lwsNA+REPfeTT3ftT40Ol2Ita3uyXf95kXv2H61b8xpIZjXCmpR5M/E/poBhryZi9H1W9OjEaN8PM+C8lHMorHnJJYAVgYsTmwBhuZRjOYh/C3QYxWRW71ZxK2EJAXsS1B/bpGQNuwaFFtHfJbPh6lJT2kYiQewVmM5NgjTNJwAs3g6jQNFLF5dQKQPPM9yBSWxgX9IUjYCMk9wpcuEx7URMEscJZ3oXh80Sqryvls+X2ZUrw6tV5+rEsd/QkbVdWIvShsBG4Dz0dN4yuXHk3DSTcMYPPyWjzXfD+9QkWsOxAWJPmR+svJNSnLL53PvnrvyM6g91wvbtc6bf22c9Outi17jote/aIDU+7Wzs9b32WTueqztsxm6A7SfXswT3PUpGNJpzFdWKniW1S0gS0FQuP2Eto+ZXzxkDtdRUy8Ymuh3YHhGHA/8+64YUcVMwCxPRd33MGEsnBM5YlCmuWG+AAgtzjR2OPwbgZtDixNOfZcIcHiUSp+gZ54YVc9cmSdccMx/NObo' \
-              '7aaxZ8MLST/2hb15IRJBC2CBHTqAkAaBCcPksqRCaqiW5Oi3IaxmGIZUQ7RSmVWPWDq2JVgbngVyGiVr9vEjPlsOyBLCiURXLUvNEQ2A9Tdo0LI5GTVqBYAIiVqhmoM1Tie+Wk3j2bzgTmwxB/L37z1YWrV+SFTjrQoprS+DSCoaCPmpR+vQTkLgKTj6Cj5vANCiGQS9HG2uGAYba+LYBmRyO0JAbwKnpQIvpftt+EB5oiUYvR2tIA8h3EzLSQpebKJmhkFq17ri6ORz1cve+/JXKhYQapTpg3GHqC7QVUCvlpACME0LwO+M9WarcY86BkspHIznuqDA52J55fALLK/Q3+eXVxbFM1Ifx+GEr56SlbEHzol08xuBp74ZisbiX9jNNGgFl15vDMxzdR2N/eZJkNCo0CJwBHalYWYsrZhHPhgBMGCgpf+hmipoKvJJTHJ5MNMze11doIOREdYxCIm7MqyqxTGb0UcMp9DhS62OjwrLZ+JE14GExhmJG1u0Oo1u67JTb/RrlyfNVr9ea/cuOw3DEGuiIdMhE/OGCBvls2FavdU5EZOMKgezqDxxnQ/Nk8bT16nXzhudmljhIV4t0AasJw0iJHr5csuHpVS349uYks2orkiFPkIKtlMs0ZHYIAZjYCGdmy73h0vMemS8sGVxLkt4243OebOL4Uj/tFMDX3ViyKWISxHZvGzESxqQq830giZB9AHK/4A2VDc3R0Z5QSKUkwqZUr5QGtIe6aCJvV3tXxvmwf6BQWHFs45anUFCix5zS/ZHCrtJpR0ZD5G+V96ydJYMh0F3LIKJ+jgMwZcvnZ+5NY10BmYBWkSRkqpihpmF3IUhC3dBNQVCrBNAtQhhOwNyWCC2OoswpMhCB5AfuigRvT89QxCg1uTG9TBOFGlGhOnfcrqAMVWRuZbV0sM5QAncUgTOpkooLIcSngtO7APsee5rw39WBHEm11VHBFvk9dcrzYAPt5/AJ4FxhKmBqEHL4rjAWayQUxSGwSHPSuLN89ppIzcZ' \
-              'koxlLbwwQRS/W5e99mXPzMnNp8D5ee8zCHPFUtb7s9qpOGT97zvNXqN/2Wn2l+fv4yZYp1E7WYNaK6e/D2M4cFM/1cWicERe53E4RoiZwyy4y3tj7gyeoD6k770QUjprwm44Fhr0lS4GZkim+h0trLDffvn9V59NmPv7r5ZqinlnjYvT3rf97retTg9StTFmbKvULba1LSQnpEBa7cZF/6RVvzyHQBr7EsDYOqjKKIxnGWi91muctjp/I+Dau7MGwoHnxuRGV/9S+QuomTQk10oKg4kdoX5gUB8RlMxv6RukO8EoHR/vG4UmiFxJCP28ed7o9/7WbnRNmrHSLlmBpJC/f3551mu2zxomrUq5gmHbG0ffOm+dNMSGsxkPCtwDWX++xs290ifj9Mk4fTJOn4zTn2Wc8KjuNlBbZbwpy4ek/riMT8JkxpSE//aL53jPEPVi1XTuCCm31/XRmrYhA4zSLP4OKREzH2sDOANjS0InJj+QuAF3vOA2vOESzKTikClLRFku8UDYvy3VqdXrjW63/7550eiftUTzH4T+aHbw8eMzV6i3ap3u89bYsl2U0fpuC90U9CZ5B8UWc6pb8otCPnE9fypbzKfvbgEq/0pecDCqxX6jSNw2m5K6MX9I6wrQSc2FtE4vjDSDYQjWwhWfjTmt1Qxu4WyD5ZEdS1Typ2Dv8El4+0/iX1R1vdhCNbA8R261y2OcrItcv9vofGjWIQcHDR9hQTvexo0iy8wn9Pt2VtUPQJG2tWptsavyMcsbZK0BmLlb2tFztwMG/yldY12S3rjnzhR4CPHLVuIMkR3PCz1j0p2NrvIOzZEgOpWm7yGyMDNHBoYH/sFuGLc90R6QfmGlDS68Q7fekoWabg9cmLkCsvax3+h0Wh1Rsl3raH/8+GKzpS1rqwgvqLF3Yq+3Li4adbANL1+OWfIu6zPTHIwYN1vdNpn15woTvHKOHLC1Allm36opi6wS9ZQdnDS7+SY+fnzKDMFR9BSbu3sOhiHz/GUrWFfzDSoD' \
-              '9vvPPgvS339Nfv9VueEJnCPPUvFUL6rZMc31raCR5jIegjABgFbVR8ZG6+Rctk9qaN4BPxZWfVBorPMLN1haKaELG1ro5W80G/Ja7/yR4rIoi4NT9QI1LzIf7h+a6kWYQoYxDVzVrIe+z6lhm1h4H2F2ziI4oXTwZimnalQzgCCqSxVtciQD+IBlKaQVi80Hr740Xyulg3/yNl9xw2JOsXkjLvx9s6XPs57meQmEYHwU48aW3IkhJptwV6aIT0OzDABbWIfPcW0mfzJ82oEWzU6MgSBVCPEE1YHAPHLC7mfWSU/B7wfm8sMkX7izgsByCMNmREjIBBaa/jh12abhUI346iqPUjig1v1DNBLG3TRKBE+nErsiYLR5HDAfD5Ak5BajZiNrPE1j386A4FicecGNBRCei7cKBCgaXwSTHbAXUkeytheFW9XtzYgM1GfTwBlL/IiM6rOrgbVbvBicgvVP6G8/AS/o8aQ/iMM7YJYVzZTB7u/yYu9XX79yvmT7lsW5c7h/MFi92Lsbg7i4uxtGHGbzazzL5gGd5TsPzGUyC5w+GJLZHfW+dUNhiRId7SmapiklYXZK+OKAGUF1v7MvQe+/IuthDSFV0FkaDnSAKEGYH+sDlvDXh9bg9SEPHEy72henhuVyejaMEgAa5r19fG85Y7zZ4PJaqu+DwRELeK6tMQ0zBs5S/dXnhhnZ7I4BnyMYYzHHSoAoolPZ4goouja1yIqCkWbOMTc80kQHD0cWMJ+Dbb8K7yAOuaYX64bPTM81qj7HaxJ3iX0191yTII4IWlRG3KMT+GsFmFiZ/D7CXnZhqES3PUy8SnMUWWg4szTWxK4wTEcVXFybMew9dkW0jCb46gpWi66vDdMHUyh8utg8BhlAzbV8nYQu8203dEAtIb2FKCOeQZICNh1CLe0z+gzMpJseD0FZw6Q8Die8nF+D0zJW88SxE/s4u6Dw9i1IppiqaS81U3vJJlF1bfwNjvvp+vAxDo82hlUc/nEa4gdiOZaUYvRNMd5m' \
-              'YqiByhCOHCXSLPKoHW2G9nwBsS5yBBL9ZKxfiWFrwtNxCMGCdtroadeFnretVaTiVzC0EXuVx/YK5Xq9DVZ7+TLDicPtVrenoeEjmWHspIfWIHRnFghtjg9H4n1pEkB5jnKYBWWsG4tkdKC6SfZfmQpooQmRx+BadNOTyPdSXaugTO2MAgjvdFRWvKdUpPOSyBR6Z4vlq4hdMCtX6Ofrcryiy4VthjdHqKtih0VaThpnjV4DycHDREQMRQRF59xzX9g2biHbkrwdJYa24EaWIN4JVv6WrBN0VQsAeM7ksrAihAZyPZvWs8QxtJfb3L0cgcdLWV3Np0lmEeSJXqJaXBfEL23HQ3TQV9SfBCIkHvfB9T0CCxC5MFCv8NnkkKn64Cezwew9AVEsyNMuT5Y9wTiiK7RPn8OpMslcmMBRPxwd6amX+tyU1V3DPp7TZ8uDWDz+tnd+ZmtvBtM0hRMJpKmODxGTevwdAz19UxEfjt+MPz/WSmBFBDIw7W8qNCSxVgXKdbNFuMBGhIEDAcCNrcPqApK+yCsyYgSjAkM8YoHrHJ+A9ybEEymLj6b2sfYmifDCMQaXtirGVUnW1ArYhMJZJA3hwETBBwY8hH9M8AMQVh4JlqNTcERueYQk6XNxfii+oBG01uBPgjCFLItG5gsTbWsHDDC9oyVekHmVYrAGKGFxVe6OLqhZwsbT32wIo35ya8SLOXkFEagUMDkQJkF+XF1h1SJDAdYdTvR4iaUwU37D5A6dLwTLnymdKYQyY47XXafMVwq3XBTfG3JnBsspY1GnMBXYssIUdyqAID2cRD5Hb0MzLMAICPoiWLD1TqvVq2gwYv2QkC9gbh/ZquPSVFe1l+AWhT+6ljuAgBIE2kgb1COL04luOD5bpv5XIJnAXLeBxZy8PKFGEAeMPZeDD6KFEQmOWRyjRYwaVVUVTAfHBJAuDwTrzQgWx8sJQhCtwQ+gv2C54MjydoyVmnSmZ07X1MRUCECA70NvNI2x70M2Bu/+kHIIkEWuCNm1' \
-              'NXu+kZYQvCQgF3FCRarlCZ+TDnwgoyW1MYd9WuSQQbtegiVAuoMr8AlFXKwBwL4xTdoKIlL35TsqeAfIB0MB/mkOxEfrRGKqJVI6qbZjM0IIKYZxNRNBVM13ApREmIyQnCkKFE9gvBNv4IH/nDlUo9IMY7EA4W5KXCMytNJSka5IN45Au65L2gI0TRFTqOCNDLuCBIOVSQBlsgo2hROg3BiZ9vG2ilHFn3LF6ZNnLjWQ28eQ96EBQ8Vd3tfTppDqg1IZao4cD+Ka/ooIKQEzpDtw7MHaLe+0aRXhIREDpOHIp3at21UEYiWmn1rgZWhMrtyQJ7TAhMU3inB4z+IFmXO86L4CL/S2TL4cDMdolWkEm733MyPw9F1tZfqWJZfSJ26DkYEj6n/vuelYM2z7oIo546NY4Cj3WQrx8gCLTloSO9r6dnP3tsKNLTt88WDEvrHu2j6XexGxM3hB6i6LNGnIsTM1zWMdsl+iXzUv5LCLhWZSalvUCzDVvkLJEzxiqII/T6BfN0DqrrAhhHQKVrhwDDsZrhKSXVQuO2dKiF6Y9o4/XHxQZ8BIP6osWfiueFie2qIx+QQCuMKsz0bThJghZO/TcJ+a0/pcwyhAO9JEj5ryRA1vZ2ITUismi6Y2mA4hS9KOIGddyKVQ5oNZH4wuMFxEPpqJGCEGZzOf/eNniCnuwY/aPayq5hvbpZkJ/QwAaKVwSzpHiEBP+W+/8Nj3FBD+jCm3HDyewn5SBl6s3Hj/+NkTHcHA0p7IN+pr6X9wJ4+d/wlfs4RFlaLqnzMDwmUtkq7IQfrhKhBdiCpQMlYum0oydRzO3UTLTfafoD9PYtzywK25LCqkUx8P4pPtEs987boFwshWexR/sSOq7dapjS14SZ92QWX9okhEhKVEFF1hEZPH8VS0saNYlPgShZAq+GNkklOOXfcgbJ/iLULFoTuIPsWAhrbF0W7l1vpmcpf2r2FZceOQfHoBg20t58A+Pd8XhivbtBNOIozE/gxF/D+jWp/M6v9/s/p4' \
-              'KCfW/KcDuR2sOP3tv+Pf/h6kv/3d5zMe+Hi8di+Ul2MytCRPrRbfMLfA1Pekwc8hpev5OySyY+IH9tMIFGWnYj4hQj+4LhbN1H8hwZAbpaaS7Jz+dA0UKZ7m8hSvK7rrxhWnKFJopnQOpIyUEsegN4oo/JEmAkLlzhzDkVKu9Fef75tfvP7KMHX4a8IbPL36et/86vDQuD7CFhKRiiYIF8BfifaxJAZG6I5C+KM7SME5NjC0IyxZbrcSeLWSthczb4vdBEa+Q/sIvk38/qUDRwt/doJ439hkVChjKB3kex+KzQ9wHnelA0H0yvxucT8fYza50iu644OKKI0og8KL7AJ9MdjnX7pDyzrcPzgcfvHFaheoAC5aPoUB8X+8In4bRP9+jS2ePMfYLI2QEuCP4SmH0Lmh2MeiIbvYw4s+e6L9sHUmFgNNSqPXSnX4nhWoNvJZlfoQEGKgDMuiEKkaxnx9Qkw3dx4Al/Uv2WCojz3fjbE+VF2ID/1hQm177OWKNi6pLVahyE72WAxyltfzsKR2zpMEb27xYCpKj9uqlqo4HBMBWx57JOhroH69bKqqVeJPoZiCV2txpZXyCf5OFE/R1OcdkV/hfcjFQ+t/FstaShlDMtV4+fKF2Bcal7ewPgQtAGGslF3QkEY6dS/3yjtUYb12spRtPknUZIz5WhHqrVUoQu1gX8Gkm/JZRlm4lY1ab6EQ/Ext2oFss8q1HFwXDar1M/iLDC5VKkpNEb85ptsEiiMKeoqXKEzB/0eIMMbgsxhwi9KqJAJy73BIVVlhRtwYMm5rr/RYaZSSf5nar9UWgfL12uJbC2Miu3BVeb7SG18s9kp/rq6grF6+fFRxVOPjx51ABY168QCrDOPfWMOUx8vcQhjPoSOcpqMQlsMl6VcOcsVtZDziFYQ/KXoSbwivVkomVwGlE5MNZbebiASJMgAEG/sA6XRTbVUCi73/Afl64rayTQAA' | base64 -d | gzip -d > /tmp/fs-story-picker.patch
-            printf '%s  %s\n' '9e3a16ac594b820e1b60255dd61e0c18fb0d59e81ce18c55d2d4a6b3d38115eb' /tmp/fs-story-picker.patch | sha256sum -c -
-            git apply --check --no-index /tmp/fs-story-picker.patch
-            git apply --no-index /tmp/fs-story-picker.patch
-            printf '%s  %s\n' '6f9fc09d7b9e6a5f20290eb546aef83e02e37ffe98878aaf4374c9e3d52d9ec3' 'web/app.js' | sha256sum -c -
-            printf '%s  %s\n' '07699ad1a7181c10c3f9e12d1ff29203d411db961c518ced2f32131de0d12d9a' 'android/app/src/main/java/com/fs/mesajlasma/MainActivity.java' | sha256sum -c -
-            printf '%s  %s\n' '2e8fdccb1b0dd79d9149debb7e4d8917765707482995f26395e2d12305827650' 'tests/test_stories_browser.py' | sha256sum -c -
+              'from pathlib import Path' \
+              'import hashlib' \
+              'p = Path('"'"'tests/dom.test.mjs'"'"')' \
+              'raw = p.read_bytes()' \
+              'old = b'"'"'const speed=document.querySelector(\'"'"'[data-action="audio-speed"]\'"'"');speed.click();assert.equal(speed.textContent,\'"'"'1.5\xc3\x97\'"'"');const audio=document.querySelector(\'"'"'audio[data-audio]\'"'"');assert.equal(audio.playbackRate,1.5);'"'"'' \
+              'new = b'"'"'const speed=document.querySelector(\'"'"'[data-action="audio-speed"]\'"'"');const audio=document.querySelector(\'"'"'audio[data-audio]\'"'"');assert.equal(audio.playbackRate,1);for(const rate of [1.25,1.5,1.75,2,1,1.25,1.5]){speed.click();assert.equal(speed.textContent,rate+\'"'"'\xc3\x97\'"'"');assert.equal(audio.playbackRate,rate);}'"'"'' \
+              'expected_old = '"'"'d266f93abbf76c32b63117c081cf1533d70b668f82f5c9dd15cbb0d5c35db448'"'"'' \
+              'expected_new = '"'"'d972ff19b47949b4db4daf2a765a6de59949e9288b56ac521631f20bc1f35969'"'"'' \
+              'assert hashlib.sha256(raw).hexdigest() == expected_old, '"'"'Unexpected original DOM test'"'"'' \
+              'assert raw.count(old) == 1, '"'"'Voice speed test anchor missing or duplicated'"'"'' \
+              'fixed = raw.replace(old, new)' \
+              'assert hashlib.sha256(fixed).hexdigest() == expected_new, '"'"'Updated test digest mismatch'"'"'' \
+              'manifest = Path('"'"'FS-FINAL-SHA256.txt'"'"')' \
+              'raw_manifest = manifest.read_bytes()' \
+              'old_entry = (expected_old + '"'"'  tests/dom.test.mjs'"'"').encode()' \
+              'new_entry = (expected_new + '"'"'  tests/dom.test.mjs'"'"').encode()' \
+              'assert raw_manifest.count(old_entry) == 1, '"'"'Original manifest entry missing or duplicated'"'"'' \
+              'p.write_bytes(fixed)' \
+              'manifest.write_bytes(raw_manifest.replace(old_entry, new_entry))' \
+              'print('"'"'DOM playback test updated: all five speeds, wraparound, and 1.5x persistence remain mandatory.'"'"')' | python3 -
+            sha256sum -c FS-FINAL-SHA256.txt > /tmp/fs-source-check.log
+            echo "Corrected regression source manifest verified."
 jobs:
   regression-tests:
     docker:
@@ -227,10 +93,16 @@ jobs:
             . .venv/bin/activate
             export FS_CHROMIUM="$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
             python tools/ci_verify.py
+            python tools/ci_source_identity.py record-tests
           no_output_timeout: 20m
       - store_artifacts:
           path: build/ci/test-logs
           destination: regression-logs
+      - persist_to_workspace:
+          root: .
+          paths:
+            - build/ci/test-logs/results.json
+            - build/ci/regression-source.json
   android-build:
     docker:
       - image: cimg/android:2026.11.1-node
@@ -238,20 +110,28 @@ jobs:
     working_directory: ~/fs-release
     steps:
       - restore_call_audio
+      - attach_workspace:
+          at: .
       - run:
           name: Build unsigned Android APK with mandatory Firebase client configuration
           command: |
             set -euo pipefail
+            python3 tools/ci_source_identity.py check-tests
             bash tools/build_push_ci.sh
             test -s build/push-metadata/build-info.json
             sha256sum build/push-metadata/build-info.json >> build/ci/SHA256SUMS.txt
             sha256sum -c build/ci/SHA256SUMS.txt
+            python3 tools/ci_source_identity.py record-build
           no_output_timeout: 20m
+      - store_artifacts:
+          path: build/ci/SHA256SUMS.txt
+          destination: unsigned-build-checksums.txt
       - persist_to_workspace:
           root: .
           paths:
             - build/ci/FS-Mesajlasma-34.32-native13-push-unsigned.apk
             - build/ci/SHA256SUMS.txt
+            - build/ci/build-source.json
             - build/push-metadata/build-info.json
   android-sign:
     docker:
@@ -268,6 +148,7 @@ jobs:
             set -euo pipefail
             test -s build/push-metadata/build-info.json
             sha256sum -c build/ci/SHA256SUMS.txt
+            python3 tools/ci_source_identity.py check-build
             sdkmanager 'build-tools;35.0.0'
             bash tools/sign_push_ci.sh
           no_output_timeout: 20m

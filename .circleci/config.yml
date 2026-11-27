@@ -8,8 +8,9 @@ commands:
           name: Restore verified merged FS 34.32 source
           command: |
             set -euo pipefail
-            FS_FINAL_SOURCE_URL="https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-34.32-Nihai-Dogrulama-v3-Kaynak-Emoji-Haric.zip"
-            FS_FINAL_SOURCE_SHA256=76fc4efb09db3c00d472980bd0f5a3455a2e929f71e1f1b0334fcac44ec7d280
+            FS_FINAL_SOURCE_URL="https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1/FS-34.32-Telegram-UI-Son-Yayin-Adayi-Kaynak-Emoji-Haric.zip"
+            FS_FINAL_SOURCE_SHA256="18253f6a727fe061c099cb673fba5004dd990a474b757ca0a58785a72c0d9cac"
+            [[ "$FS_FINAL_SOURCE_SHA256" =~ ^[0-9a-fA-F]{64}$ ]]
             curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' -o /tmp/fs-final.zip "$FS_FINAL_SOURCE_URL"
             printf '%s  %s\n' "$FS_FINAL_SOURCE_SHA256" /tmp/fs-final.zip | sha256sum -c -
             mkdir -p /tmp/fs-final-source
@@ -31,44 +32,16 @@ commands:
               unzip -oq "/tmp/fs-emoji-v4/$name" -d .
               rm -f "/tmp/fs-emoji-v4/$name"
             done
-            # The six V4 archives contain ONLY the 881 legacy animations.
-            # Restore the remaining 2876 from the already configured, pinned old source.
-            : "${FS_SOURCE_URL:?Existing legacy source URL is required to restore extra emoji}"
-            curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' -o /tmp/fs-legacy-source.zip "$FS_SOURCE_URL"
-            printf '%s  %s\n' 'ff3bfa30e21b0515d12093978540a9078a9a91358f570a74818eedc3dada4d3f' /tmp/fs-legacy-source.zip | sha256sum -c -
-            unzip -oq /tmp/fs-legacy-source.zip 'web/emoji-extra/*.webp' -d .
-            rm -f /tmp/fs-legacy-source.zip
-            python3 tools/verify_release_assets.py
+            # The six archives cover only the 881 legacy assets. Restore the pinned extra pack.
+            curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' -o /tmp/fs-extra.zip "$release_base/FS-34.32-Arama-Sesi-Zil-Sesi-Birlesik-Kaynak.zip"
+            printf '%s  %s\n' 'ff3bfa30e21b0515d12093978540a9078a9a91358f570a74818eedc3dada4d3f' /tmp/fs-extra.zip | sha256sum -c -
+            unzip -oq /tmp/fs-extra.zip 'web/emoji-extra/*.webp' -d .
+            rm -f /tmp/fs-extra.zip
             if ! sha256sum -c FS-FINAL-SHA256.txt > /tmp/fs-source-check.log 2>&1; then
               grep -v ': OK$' /tmp/fs-source-check.log | head -80 || true
               exit 1
             fi
-            echo "All 5089 source files verified (including all 3757 emoji assets)."
-            # The expanded voice speed sequence intentionally includes 1.25x and 1.75x.
-            # Verify the original release first, then apply the same hash-pinned test correction in every job.
-            printf '%s\n' \
-              'from pathlib import Path' \
-              'import hashlib' \
-              'p = Path('"'"'tests/dom.test.mjs'"'"')' \
-              'raw = p.read_bytes()' \
-              'old = b'"'"'const speed=document.querySelector(\'"'"'[data-action="audio-speed"]\'"'"');speed.click();assert.equal(speed.textContent,\'"'"'1.5\xc3\x97\'"'"');const audio=document.querySelector(\'"'"'audio[data-audio]\'"'"');assert.equal(audio.playbackRate,1.5);'"'"'' \
-              'new = b'"'"'const speed=document.querySelector(\'"'"'[data-action="audio-speed"]\'"'"');const audio=document.querySelector(\'"'"'audio[data-audio]\'"'"');assert.equal(audio.playbackRate,1);for(const rate of [1.25,1.5,1.75,2,1,1.25,1.5]){speed.click();assert.equal(speed.textContent,rate+\'"'"'\xc3\x97\'"'"');assert.equal(audio.playbackRate,rate);}'"'"'' \
-              'expected_old = '"'"'d266f93abbf76c32b63117c081cf1533d70b668f82f5c9dd15cbb0d5c35db448'"'"'' \
-              'expected_new = '"'"'d972ff19b47949b4db4daf2a765a6de59949e9288b56ac521631f20bc1f35969'"'"'' \
-              'assert hashlib.sha256(raw).hexdigest() == expected_old, '"'"'Unexpected original DOM test'"'"'' \
-              'assert raw.count(old) == 1, '"'"'Voice speed test anchor missing or duplicated'"'"'' \
-              'fixed = raw.replace(old, new)' \
-              'assert hashlib.sha256(fixed).hexdigest() == expected_new, '"'"'Updated test digest mismatch'"'"'' \
-              'manifest = Path('"'"'FS-FINAL-SHA256.txt'"'"')' \
-              'raw_manifest = manifest.read_bytes()' \
-              'old_entry = (expected_old + '"'"'  tests/dom.test.mjs'"'"').encode()' \
-              'new_entry = (expected_new + '"'"'  tests/dom.test.mjs'"'"').encode()' \
-              'assert raw_manifest.count(old_entry) == 1, '"'"'Original manifest entry missing or duplicated'"'"'' \
-              'p.write_bytes(fixed)' \
-              'manifest.write_bytes(raw_manifest.replace(old_entry, new_entry))' \
-              'print('"'"'DOM playback test updated: all five speeds, wraparound, and 1.5x persistence remain mandatory.'"'"')' | python3 -
-            sha256sum -c FS-FINAL-SHA256.txt > /tmp/fs-source-check.log
-            echo "Corrected regression source manifest verified."
+            python3 tools/verify_release_assets.py
 jobs:
   regression-tests:
     docker:
@@ -123,9 +96,6 @@ jobs:
             sha256sum -c build/ci/SHA256SUMS.txt
             python3 tools/ci_source_identity.py record-build
           no_output_timeout: 20m
-      - store_artifacts:
-          path: build/ci/SHA256SUMS.txt
-          destination: unsigned-build-checksums.txt
       - persist_to_workspace:
           root: .
           paths:

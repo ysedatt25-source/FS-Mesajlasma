@@ -31,8 +31,19 @@ commands:
               unzip -oq "/tmp/fs-emoji-v4/$name" -d .
               rm -f "/tmp/fs-emoji-v4/$name"
             done
-            sha256sum -c FS-FINAL-SHA256.txt > /tmp/fs-source-check.log
+            # The six V4 archives contain ONLY the 881 legacy animations.
+            # Restore the remaining 2876 from the already configured, pinned old source.
+            : "${FS_SOURCE_URL:?Existing legacy source URL is required to restore extra emoji}"
+            curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' -o /tmp/fs-legacy-source.zip "$FS_SOURCE_URL"
+            printf '%s  %s\n' 'ff3bfa30e21b0515d12093978540a9078a9a91358f570a74818eedc3dada4d3f' /tmp/fs-legacy-source.zip | sha256sum -c -
+            unzip -oq /tmp/fs-legacy-source.zip 'web/emoji-extra/*.webp' -d .
+            rm -f /tmp/fs-legacy-source.zip
             python3 tools/verify_release_assets.py
+            if ! sha256sum -c FS-FINAL-SHA256.txt > /tmp/fs-source-check.log 2>&1; then
+              grep -v ': OK$' /tmp/fs-source-check.log | head -80 || true
+              exit 1
+            fi
+            echo "All 5089 source files verified (including all 3757 emoji assets)."
 jobs:
   regression-tests:
     docker:

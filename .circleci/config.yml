@@ -8,8 +8,8 @@ commands:
           name: Restore pinned animation assets for checked-out source
           command: |
             set -euo pipefail
-            printf '%s  %s\n' f02d7a7942440c44a3f4e8a018f9f09a0aea432e1095f1c97f73902572303242 /tmp/fs-repository/FS-Native15-Verified-Source.zip | sha256sum -c -
-            unzip -oq /tmp/fs-repository/FS-Native15-Verified-Source.zip -d .
+            printf '%s  %s\n' 6f00c330c1587df14165b33236ee399f5eee9a61a7c01c293178465dbc72e3ac /tmp/fs-repository/FS-Native16-Verified-Source.zip | sha256sum -c -
+            unzip -oq /tmp/fs-repository/FS-Native16-Verified-Source.zip -d .
             # Restore exact animation assets from existing verified releases.
             release_base="https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1"
             mkdir -p /tmp/fs-emoji-v4
@@ -93,7 +93,7 @@ jobs:
       - persist_to_workspace:
           root: .
           paths:
-            - build/ci/FS-Mesajlasma-34.32-native15-push-unsigned.apk
+            - build/ci/FS-Mesajlasma-34.32-native16-push-unsigned.apk
             - build/ci/SHA256SUMS.txt
             - build/ci/build-source.json
             - build/push-metadata/build-info.json

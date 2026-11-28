@@ -8,7 +8,7 @@ commands:
           name: Restore pinned animation assets for checked-out source
           command: |
             set -euo pipefail
-            printf '%s  %s\n' c8b3aff46e897144c0fc63c2f3a2ad3b4ae40e6cb8cef34c3ccc527470258057 /tmp/fs-repository/FS-Native15-Verified-Source.zip | sha256sum -c -
+            printf '%s  %s\n' f02d7a7942440c44a3f4e8a018f9f09a0aea432e1095f1c97f73902572303242 /tmp/fs-repository/FS-Native15-Verified-Source.zip | sha256sum -c -
             unzip -oq /tmp/fs-repository/FS-Native15-Verified-Source.zip -d .
             # Restore exact animation assets from existing verified releases.
             release_base="https://github.com/ysedatt25-source/FS-Mesajlasma/releases/download/v34.32-dev.1"
